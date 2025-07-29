@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <!-- Left column - Form -->
-    <div class="col-md-6">
+<div class="row justify-content-center">
+    <!-- Centered form - full width on mobile, constrained on larger screens -->
+    <div class="col-lg-8 col-xl-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Resource</h5>
+                <h5 class="mb-0">Submit External Resource</h5>
+                <small class="text-muted">Add a new external resource annotation that will be reviewed via pull request</small>
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('submit_resource') }}" id="resourceForm">
@@ -151,74 +152,10 @@
                         </button>
                         <button type="submit" 
                                 class="btn btn-primary">
-                            SAVE ITEM <i class="fas fa-arrow-right ms-1"></i>
+                            SUBMIT FOR REVIEW <i class="fas fa-paper-plane ms-1"></i>
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Right column - Existing Resources -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Existing Resources</h5>
-            </div>
-            <div class="card-body">
-                <div id="existing-resources">
-                    <!-- Example existing resources (these would be loaded dynamically) -->
-                    <div class="resource-item mb-3 p-3 border rounded">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="resource-identifier">
-                                    <i class="fas fa-equals"></i> schneider-lab-to-nwb
-                                </div>
-                            </div>
-                            <div class="resource-actions">
-                                <button class="btn btn-sm btn-outline-danger me-2">
-                                    <i class="fas fa-times"></i> REMOVE
-                                </button>
-                                <button class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-edit"></i> EDIT
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="resource-item mb-3 p-3 border rounded">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="resource-identifier">
-                                    <i class="fas fa-equals"></i> Example Notebooks
-                                </div>
-                            </div>
-                            <div class="resource-actions">
-                                <button class="btn btn-sm btn-outline-danger me-2">
-                                    <i class="fas fa-times"></i> REMOVE
-                                </button>
-                                <button class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-edit"></i> EDIT
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="resource-item mb-3 p-3 border rounded">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="resource-identifier">
-                                    <i class="fas fa-equals"></i> *
-                                </div>
-                            </div>
-                            <div class="resource-actions">
-                                <button class="btn btn-sm btn-outline-danger">
-                                    <i class="fas fa-times"></i> REMOVE
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

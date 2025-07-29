@@ -49,27 +49,3 @@
   relation: dcite:IsCitedBy
   resourceType: dcite:PeerReview
   schemaKey: ExternalResource
-- annotation_contributor:
-    name: Paul Adkisson
-    email: paul.wesley.adkisson@gmail.com
-    schemaKey: AnnotationContributor
-    identifier: https://orcid.org/0009-0005-8943-5450
-  annotation_date: '2025-07-29T14:14:12.320434'
-  name: My External Resource
-  url: https://docs.cline.bot/features/drag-and-drop
-  repository: Cline
-  relation: dcite:IsCitedBy
-  resourceType: dcite:PeerReview
-  schemaKey: ExternalResource
-- annotation_contributor:
-    name: Paul Adkisson
-    email: paul.wesley.adkisson@gmail.com
-    schemaKey: AnnotationContributor
-    identifier: https://orcid.org/0009-0005-8943-5450
-  annotation_date: '2025-07-29T14:14:16.753072'
-  name: My External Resource
-  url: https://docs.cline.bot/features/drag-and-drop
-  repository: Cline
-  relation: dcite:IsCitedBy
-  resourceType: dcite:PeerReview
-  schemaKey: ExternalResource
