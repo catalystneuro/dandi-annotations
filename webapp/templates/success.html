@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                </div>
+                
+                <h2 class="text-success mb-3">Resource Successfully Added!</h2>
+                
+                <p class="lead mb-4">
+                    Your external resource has been successfully saved to the YAML file and is now available for use with DANDI annotations.
+                </p>
+                
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    The resource has been validated against your Pydantic models and added to the external_resources.yaml file.
+                </div>
+                
+                <div class="mt-4">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-plus me-2"></i>Add Another Resource
+                    </a>
+                    
+                    <button class="btn btn-outline-secondary btn-lg" onclick="window.close()">
+                        <i class="fas fa-times me-2"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
