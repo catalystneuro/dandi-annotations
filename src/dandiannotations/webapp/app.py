@@ -109,13 +109,6 @@ def submit_resource():
             'schemaKey': 'ExternalResource'
         }
         
-        # Add GitHub PR URL if provided
-        if form_data.get('github_pr_url'):
-            if validate_url(form_data['github_pr_url']):
-                resource_data['github_pr_url'] = form_data['github_pr_url']
-            else:
-                flash('Error: Invalid GitHub PR URL format', 'error')
-                return redirect(url_for('index'))
         
         # Validate using Pydantic models
         try:

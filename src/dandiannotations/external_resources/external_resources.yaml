@@ -73,3 +73,39 @@
   relation: dcite:IsCitedBy
   resourceType: dcite:PeerReview
   schemaKey: ExternalResource
+- annotation_contributor:
+    name: Paul Adkisson
+    email: paul.wesley.adkisson@gmail.com
+    schemaKey: AnnotationContributor
+    identifier: https://orcid.org/0009-0005-8943-5450
+  annotation_date: '2025-07-29T14:28:26.443134'
+  name: New Resource
+  url: https://www.example.com/
+  repository: Random Urls
+  relation: dcite:IsReferencedBy
+  resourceType: dcite:Collection
+  schemaKey: ExternalResource
+- annotation_contributor:
+    name: Paul Adkisson
+    email: paul.wesley.adkisson@gmail.com
+    schemaKey: AnnotationContributor
+    identifier: https://orcid.org/0009-0005-8943-5450
+  annotation_date: '2025-07-29T14:32:53.649558'
+  name: New Resource
+  url: https://www.example.com/
+  repository: Random Urls
+  relation: dcite:Compiles
+  resourceType: dcite:OutputManagementPlan
+  schemaKey: ExternalResource
+- annotation_contributor:
+    name: Paul Adkisson
+    email: paul.wesley.adkisson@gmail.com
+    schemaKey: AnnotationContributor
+    identifier: https://orcid.org/0009-0005-8943-5450
+  annotation_date: '2025-07-29T14:33:57.677643'
+  name: My External Resource
+  url: http://a;sdlkfjasdlk
+  repository: Cline
+  relation: dcite:IsCitedBy
+  resourceType: dcite:Book
+  schemaKey: ExternalResource
