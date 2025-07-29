@@ -57,8 +57,9 @@ Open your web browser and navigate to: `http://127.0.0.1:5000`
 
 ## Web Application Features
 
-- **Professional UI**: Matches DANDI design with responsive Bootstrap 5 styling
-- **Complete Form**: All fields from the DANDI resource form with validation
+- **Submission-Focused Interface**: Clean, streamlined form for submitting external resource annotations
+- **Professional UI**: Responsive Bootstrap 5 styling with DANDI design principles
+- **Review Workflow Integration**: Submissions are saved for review via pull request process
 - **Pydantic Integration**: Uses existing `ExternalResource` and `AnnotationContributor` models
 - **YAML Storage**: Saves data in the same format as `external_resources.yaml`
 - **Automatic Backups**: Creates timestamped backups before modifications
@@ -67,7 +68,7 @@ Open your web browser and navigate to: `http://127.0.0.1:5000`
 
 ## Form Fields
 
-The webapp includes all the fields from the DANDI resource form:
+The webapp includes a streamlined submission form with the following fields:
 
 ### Resource Information
 - **Identifier**: Optional identifier for the resource
@@ -83,16 +84,14 @@ The webapp includes all the fields from the DANDI resource form:
 - **ORCID**: Optional ORCID identifier (auto-formatted)
 - **URL**: Optional contributor website
 
-### Additional Information
-- **GitHub PR URL**: Optional link to related pull request
+## Submission Workflow
 
-## Data Flow
-
-1. **Form Submission**: User fills out and submits the form
-2. **Validation**: Data is validated using your Pydantic models
+1. **Form Submission**: User fills out and submits the form for review
+2. **Validation**: Data is validated using Pydantic models
 3. **Backup**: Current YAML file is backed up with timestamp
 4. **Storage**: New resource is appended to `external_resources.yaml`
-5. **Confirmation**: Success page confirms the operation
+5. **Review Process**: Submission goes through pull request review before official integration
+6. **Confirmation**: Success page confirms submission and explains review process
 
 ## Validation Features
 
