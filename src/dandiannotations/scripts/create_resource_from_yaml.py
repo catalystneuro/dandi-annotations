@@ -1,9 +1,9 @@
 import yaml
-from src.dandiannotations.models import AnnotationContributor, ExternalResource
+from dandiannotations.models.models import AnnotationContributor, ExternalResource
 from dandischema.models import RelationType, ResourceType
 
 def main():
-    with open('external_resources.yaml', 'r') as f:
+    with open('src/dandiannotations/external_resources/external_resources.yaml', 'r') as f:
         metadata = yaml.safe_load(f)
 
     external_resources = []

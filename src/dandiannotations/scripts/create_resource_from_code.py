@@ -1,4 +1,4 @@
-from src.dandiannotations.models import AnnotationContributor, ExternalResource
+from dandiannotations.models.models import AnnotationContributor, ExternalResource
 from dandischema.models import RelationType
 from datetime import datetime
 

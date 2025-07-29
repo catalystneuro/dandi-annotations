@@ -1,0 +1,8 @@
+name: dandi_annotations_env
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9
+  - pip
+  - pip:
+    - -e .

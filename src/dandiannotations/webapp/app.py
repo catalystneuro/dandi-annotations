@@ -10,15 +10,15 @@ import re
 # Add the parent directory to the path to import our models
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from utils.yaml_handler import YAMLHandler
-from utils.schema_utils import get_resource_relation_options, get_resource_type_options
-from src.dandiannotations.models import ExternalResource, AnnotationContributor
+from dandiannotations.webapp.utils.yaml_handler import YAMLHandler
+from dandiannotations.webapp.utils.schema_utils import get_resource_relation_options, get_resource_type_options
+from dandiannotations.models.models import ExternalResource, AnnotationContributor
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'
 
 # Configuration
-YAML_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'external_resources.yaml')
+YAML_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'external_resources', 'external_resources.yaml')
 yaml_handler = YAMLHandler(YAML_FILE_PATH)
 
 def validate_email(email):
@@ -145,5 +145,10 @@ def clear_form():
     """Handle clear form request"""
     return redirect(url_for('index'))
 
-if __name__ == '__main__':
+def main():
+    """Main entry point for the webapp."""
     app.run(debug=True, host='127.0.0.1', port=5000)
+
+
+if __name__ == '__main__':
+    main()
