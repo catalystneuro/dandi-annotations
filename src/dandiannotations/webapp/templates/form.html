@@ -11,6 +11,26 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('submit_resource') }}" id="resourceForm">
+                    <!-- DANDI Set Information -->
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control" 
+                                   name="dandiset_id" 
+                                   placeholder="DANDI Set ID (e.g., 000001)"
+                                   id="dandiset_id"
+                                   pattern="[0-9]{6}|dandiset_[0-9]{6}"
+                                   title="Enter 6-digit DANDI set ID (e.g., 000001) or full format (e.g., dandiset_000001)"
+                                   required>
+                            <span class="input-group-text">
+                                <i class="fas fa-info-circle text-primary" 
+                                   data-bs-toggle="tooltip" 
+                                   title="The DANDI set identifier this resource belongs to"></i>
+                            </span>
+                        </div>
+                        <div class="form-text text-danger">required information</div>
+                    </div>
+
                     <!-- Resource Information Section -->
                     <div class="mb-3">
                         <input type="text" 

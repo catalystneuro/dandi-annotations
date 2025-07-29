@@ -2,27 +2,32 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-body text-center py-5">
-                <div class="mb-4">
-                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+    <div class="col-lg-8 col-xl-6">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-check-circle"></i> Success!
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <h4 class="alert-heading">Resource Successfully Submitted!</h4>
+                    <p>Your external resource annotation has been successfully submitted for community review.</p>
+                    <hr>
+                    <p class="mb-0">The resource is now visible in the community submissions section and awaits moderator endorsement.</p>
                 </div>
                 
-                <h2 class="text-success mb-3">Resource Successfully Submitted!</h2>
-                
-                <p class="lead mb-4">
-                    Your external resource annotation has been successfully submitted and saved for review.
-                </p>
-                
-                <div class="alert alert-info" role="alert">
-                    <i class="fas fa-info-circle me-2"></i>
-                    The resource has been validated and will go through a review process via pull request before being officially added to the DANDI dataset.
-                </div>
-                
-                <div class="mt-4">
-                    <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-plus me-2"></i>Submit Another Resource
+                <div class="d-flex justify-content-between flex-wrap gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Submit Another Resource
+                    </a>
+                    {% if dandiset_id %}
+                    <a href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id) }}" class="btn btn-info">
+                        <i class="fas fa-eye"></i> View {{ dandiset_id }} Resources
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('moderate') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-gavel"></i> Moderation Interface
                     </a>
                 </div>
             </div>

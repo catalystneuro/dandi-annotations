@@ -21,6 +21,10 @@ class AnnotationContributor(DandiBaseModel):
     )
 
 class ExternalResource(Resource):
+    dandiset_id: str = Field(
+        title="DANDI Set ID",
+        description="The DANDI set identifier this resource is associated with (e.g., '000001')"
+    )
     annotation_contributor: AnnotationContributor = Field(
         title="Annotation Contributor",
         description="Person or organization who annotated this resource"

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>External Resources for {{ dandiset_id }}</h2>
+                    <p class="text-muted">Community and endorsed external resources for this DANDI set</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add New Resource
+                    </a>
+                    <a href="{{ url_for('moderate') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-gavel"></i> Moderate
+                    </a>
+                </div>
+            </div>
+
+            <!-- Endorsed Resources Section -->
+            <div class="mb-5">
+                <h3 class="mb-3">
+                    <i class="fas fa-check-circle text-success"></i> 
+                    Endorsed Resources
+                    <span class="badge bg-success">{{ endorsed_submissions|length }}</span>
+                </h3>
+                
+                {% if endorsed_submissions %}
+                    <div class="row">
+                        {% for resource in endorsed_submissions %}
+                        <div class="col-lg-6 col-xl-4 mb-3">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{ resource.name }}</h6>
+                                    <span class="badge bg-light text-success">
+                                        <i class="fas fa-check"></i> Endorsed
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text">
+                                        <strong>URL:</strong> 
+                                        <a href="{{ resource.url }}" target="_blank" class="text-decoration-none">
+                                            {{ resource.url[:50] }}{% if resource.url|length > 50 %}...{% endif %}
+                                            <i class="fas fa-external-link-alt ms-1"></i>
+                                        </a>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Repository:</strong> {{ resource.repository }}
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Type:</strong> 
+                                        <span class="badge bg-secondary">{{ resource.resourceType }}</span>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Relation:</strong> 
+                                        <span class="badge bg-info">{{ resource.relation }}</span>
+                                    </p>
+                                    <hr>
+                                    <small class="text-muted">
+                                        <strong>Contributor:</strong> {{ resource.annotation_contributor.name }}<br>
+                                        <strong>Submitted:</strong> {{ resource.annotation_date[:10] }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        No endorsed resources yet for this DANDI set.
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Community Submissions Section -->
+            <div class="mb-5">
+                <h3 class="mb-3">
+                    <i class="fas fa-clock text-warning"></i> 
+                    Community Submissions
+                    <span class="badge bg-warning text-dark">{{ community_submissions|length }}</span>
+                </h3>
+                
+                {% if community_submissions %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Note:</strong> These resources are pending review and have not yet been endorsed by moderators.
+                    </div>
+                    
+                    <div class="row">
+                        {% for resource in community_submissions %}
+                        <div class="col-lg-6 col-xl-4 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{ resource.name }}</h6>
+                                    <span class="badge bg-light text-warning">
+                                        <i class="fas fa-clock"></i> Pending
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text">
+                                        <strong>URL:</strong> 
+                                        <a href="{{ resource.url }}" target="_blank" class="text-decoration-none">
+                                            {{ resource.url[:50] }}{% if resource.url|length > 50 %}...{% endif %}
+                                            <i class="fas fa-external-link-alt ms-1"></i>
+                                        </a>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Repository:</strong> {{ resource.repository }}
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Type:</strong> 
+                                        <span class="badge bg-secondary">{{ resource.resourceType }}</span>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Relation:</strong> 
+                                        <span class="badge bg-info">{{ resource.relation }}</span>
+                                    </p>
+                                    <hr>
+                                    <small class="text-muted">
+                                        <strong>Contributor:</strong> {{ resource.annotation_contributor.name }}<br>
+                                        <strong>Submitted:</strong> {{ resource.annotation_date[:10] }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-secondary">
+                        <i class="fas fa-info-circle"></i>
+                        No pending community submissions for this DANDI set.
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h4 class="text-success">{{ endorsed_submissions|length }}</h4>
+                            <p class="mb-0">Endorsed Resources</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h4 class="text-warning">{{ community_submissions|length }}</h4>
+                            <p class="mb-0">Pending Review</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
