@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-5">
+                <div>
+                    <h1><i class="fas fa-question-circle text-primary"></i> How It Works</h1>
+                    <p class="lead text-muted">Understanding the DANDI External Resources submission and review process</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-home"></i> Back to Home
+                    </a>
+                </div>
+            </div>
+
+            <!-- Process Overview -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card bg-light border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0"><i class="fas fa-info-circle"></i> Process Overview</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="lead">The DANDI External Resources system uses a two-tiered approach to ensure quality and relevance of community contributions.</p>
+                            <div class="row">
+                                <div class="col-md-4 text-center mb-4">
+                                    <div class="p-4">
+                                        <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                            <i class="fas fa-plus-circle fa-2x"></i>
+                                        </div>
+                                        <h4 class="text-primary">1. Submit</h4>
+                                        <p class="text-muted">Community members submit external resources related to DANDI datasets through our web form</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center mb-4">
+                                    <div class="p-4">
+                                        <div class="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                            <i class="fas fa-search fa-2x"></i>
+                                        </div>
+                                        <h4 class="text-warning">2. Review</h4>
+                                        <p class="text-muted">Moderators review submissions for relevance, quality, and adherence to community standards</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center mb-4">
+                                    <div class="p-4">
+                                        <div class="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                                            <i class="fas fa-check-circle fa-2x"></i>
+                                        </div>
+                                        <h4 class="text-success">3. Endorse</h4>
+                                        <p class="text-muted">Approved resources are endorsed and made available to the broader DANDI community</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Steps -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <h2 class="mb-4"><i class="fas fa-list-ol"></i> Detailed Process</h2>
+                </div>
+            </div>
+
+            <!-- Step 1: Submission -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0"><i class="fas fa-plus-circle"></i> Step 1: Community Submission</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5>What happens during submission:</h5>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Contributors fill out a detailed form with resource information</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> System validates all required fields and formats</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Submission is saved to the "community" folder for review</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Contributors receive confirmation of successful submission</li>
+                                    </ul>
+                                    
+                                    <h5 class="mt-4">Required Information:</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>Resource Details:</strong>
+                                            <ul class="small">
+                                                <li>DANDI Set ID</li>
+                                                <li>Resource name and URL</li>
+                                                <li>Repository information</li>
+                                                <li>Resource type and relation</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Contributor Information:</strong>
+                                            <ul class="small">
+                                                <li>Name and email (required)</li>
+                                                <li>ORCID identifier (optional)</li>
+                                                <li>Personal/institutional URL (optional)</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="bg-light p-3 rounded">
+                                        <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                                        <p class="small text-muted">Submissions are immediately visible in the "pending" section</p>
+                                        <a href="{{ url_for('submit_form') }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-plus"></i> Submit Resource
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Review -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h4 class="mb-0"><i class="fas fa-search"></i> Step 2: Moderation Review</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5>Review Criteria:</h5>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> <strong>Relevance:</strong> Resource must be directly related to the specified DANDI set</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> <strong>Quality:</strong> Resource should provide value to the research community</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> <strong>Accessibility:</strong> Links must be functional and publicly accessible</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> <strong>Appropriateness:</strong> Content should align with DANDI community standards</li>
+                                    </ul>
+                                    
+                                    <h5 class="mt-4">Moderator Actions:</h5>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><i class="fas fa-eye text-info"></i> Review submission details and verify resource accessibility</li>
+                                        <li class="mb-2"><i class="fas fa-link text-info"></i> Check that the resource URL is functional and appropriate</li>
+                                        <li class="mb-2"><i class="fas fa-clipboard-check text-info"></i> Assess relevance to the specified DANDI set</li>
+                                        <li class="mb-2"><i class="fas fa-gavel text-info"></i> Make endorsement decision with moderator attribution</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="bg-light p-3 rounded">
+                                        <i class="fas fa-users fa-3x text-warning mb-3"></i>
+                                        <p class="small text-muted">Trusted community moderators review all submissions</p>
+                                        <a href="{{ url_for('moderate') }}" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-gavel"></i> Moderation Interface
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Endorsement -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0"><i class="fas fa-check-circle"></i> Step 3: Endorsement</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5>What happens during endorsement:</h5>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Moderator provides their contact information for attribution</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Resource is moved from "community" to "endorsed" status</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Endorsement date and moderator information are recorded</li>
+                                        <li class="mb-2"><i class="fas fa-check text-success"></i> Resource becomes visible in the official endorsed section</li>
+                                    </ul>
+                                    
+                                    <h5 class="mt-4">Benefits of Endorsement:</h5>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><i class="fas fa-star text-warning"></i> <strong>Credibility:</strong> Community trust through moderator review</li>
+                                        <li class="mb-2"><i class="fas fa-shield-alt text-primary"></i> <strong>Quality Assurance:</strong> Verified relevance and accessibility</li>
+                                        <li class="mb-2"><i class="fas fa-search-plus text-info"></i> <strong>Discoverability:</strong> Prominent placement in endorsed section</li>
+                                        <li class="mb-2"><i class="fas fa-history text-secondary"></i> <strong>Provenance:</strong> Full attribution trail maintained</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="bg-light p-3 rounded">
+                                        <i class="fas fa-award fa-3x text-success mb-3"></i>
+                                        <p class="small text-muted">Endorsed resources receive community seal of approval</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resource Types -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-tags"></i> Types of External Resources</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-code text-primary"></i> Code & Analysis</h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Analysis scripts and notebooks</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Data processing pipelines</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Visualization tools</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Statistical analysis code</li>
+                                    </ul>
+                                    
+                                    <h5><i class="fas fa-book text-success"></i> Publications</h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Research papers</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Preprints and manuscripts</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Conference presentations</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Technical reports</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-database text-info"></i> Related Data</h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Supplementary datasets</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Processed data derivatives</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Metadata and annotations</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Related experimental data</li>
+                                    </ul>
+                                    
+                                    <h5><i class="fas fa-graduation-cap text-warning"></i> Educational</h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Tutorials and guides</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Documentation</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Educational materials</li>
+                                        <li><i class="fas fa-chevron-right text-muted"></i> Best practices</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Call to Action -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h3><i class="fas fa-rocket"></i> Ready to Contribute?</h3>
+                            <p class="lead">Join the DANDI community in building a comprehensive resource ecosystem</p>
+                            <div class="d-flex justify-content-center gap-3 mt-4">
+                                <a href="{{ url_for('submit_form') }}" class="btn btn-light btn-lg">
+                                    <i class="fas fa-plus"></i> Submit a Resource
+                                </a>
+                                <a href="{{ url_for('index') }}" class="btn btn-outline-light btn-lg">
+                                    <i class="fas fa-home"></i> Browse Resources
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

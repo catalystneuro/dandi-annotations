@@ -19,6 +19,9 @@
                         <a href="{{ url_for('moderate') }}" class="btn btn-outline-light btn-lg">
                             <i class="fas fa-gavel"></i> Moderate Submissions
                         </a>
+                        <a href="{{ url_for('how_it_works') }}" class="btn btn-outline-light btn-lg">
+                            <i class="fas fa-question-circle"></i> How It Works
+                        </a>
                     </div>
                 </div>
             </div>
@@ -73,60 +76,87 @@
                 </div>
 
                 {% if all_dandisets %}
-                    <div class="row">
-                        {% for dandiset in all_dandisets %}
-                        <div class="col-lg-6 col-xl-4 mb-4">
-                            <div class="card h-100 border-primary">
-                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">{{ dandiset.display_id }}</h5>
-                                    <span class="badge bg-light text-primary">
-                                        {{ dandiset.total_count }} resource{{ 's' if dandiset.total_count != 1 else '' }}
-                                    </span>
+                    <!-- Search Bar -->
+                    <div class="mb-4">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="dandisetSearch" 
+                                   placeholder="Search DANDISets by ID or description..."
+                                   onkeyup="filterDandisets()">
+                        </div>
+                    </div>
+
+                    <!-- DANDISets List -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <strong>DANDI Set</strong>
                                 </div>
-                                <div class="card-body d-flex flex-column">
-                                    <div class="flex-grow-1">
-                                        <div class="row text-center mb-3">
-                                            <div class="col-6">
-                                                <div class="p-2 bg-success text-white rounded">
-                                                    <i class="fas fa-check-circle"></i>
-                                                    <div class="h4 mb-0">{{ dandiset.endorsed_count }}</div>
-                                                    <small>Endorsed</small>
-                                                </div>
-                                            </div>
-                                            <div class="col-6">
-                                                <div class="p-2 bg-warning text-dark rounded">
-                                                    <i class="fas fa-clock"></i>
-                                                    <div class="h4 mb-0">{{ dandiset.community_count }}</div>
-                                                    <small>Pending</small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {% if dandiset.endorsed_count > 0 %}
-                                        <p class="text-success mb-1">
-                                            <i class="fas fa-check-circle"></i>
-                                            {{ dandiset.endorsed_count }} endorsed resource{{ 's' if dandiset.endorsed_count != 1 else '' }}
-                                        </p>
-                                        {% endif %}
-                                        
-                                        {% if dandiset.community_count > 0 %}
-                                        <p class="text-warning mb-1">
-                                            <i class="fas fa-clock"></i>
-                                            {{ dandiset.community_count }} pending review
-                                        </p>
-                                        {% endif %}
-                                    </div>
-                                    
-                                    <div class="mt-3">
-                                        <a href="{{ url_for('dandiset_resources', dandiset_id=dandiset.id) }}" 
-                                           class="btn btn-primary w-100">
-                                            <i class="fas fa-eye"></i> View Resources
-                                        </a>
-                                    </div>
+                                <div class="col-md-2 text-center">
+                                    <strong>Endorsed</strong>
+                                </div>
+                                <div class="col-md-2 text-center">
+                                    <strong>Pending</strong>
+                                </div>
+                                <div class="col-md-2 text-center">
+                                    <strong>Total</strong>
+                                </div>
+                                <div class="col-md-2 text-center">
+                                    <strong>Actions</strong>
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
+                        <div class="card-body p-0">
+                            <div id="dandisetsList">
+                                {% for dandiset in all_dandisets %}
+                                <div class="dandiset-row border-bottom p-3" data-dandiset-id="{{ dandiset.display_id|lower }}">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-database text-primary me-2"></i>
+                                                <div>
+                                                    <h6 class="mb-0">{{ dandiset.display_id }}</h6>
+                                                    <small class="text-muted">External resources available</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2 text-center">
+                                            <span class="badge bg-success fs-6">
+                                                <i class="fas fa-check-circle"></i> {{ dandiset.endorsed_count }}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-2 text-center">
+                                            <span class="badge bg-warning text-dark fs-6">
+                                                <i class="fas fa-clock"></i> {{ dandiset.community_count }}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-2 text-center">
+                                            <span class="badge bg-secondary fs-6">
+                                                <i class="fas fa-link"></i> {{ dandiset.total_count }}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-2 text-center">
+                                            <a href="{{ url_for('dandiset_resources', dandiset_id=dandiset.id) }}" 
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- No Results Message (hidden by default) -->
+                    <div id="noResults" class="alert alert-info mt-3" style="display: none;">
+                        <i class="fas fa-search"></i>
+                        No DANDISets match your search criteria.
                     </div>
                 {% else %}
                     <div class="text-center py-5">
@@ -144,87 +174,36 @@
                 {% endif %}
             </div>
 
-            <!-- How It Works Section -->
-            <div class="row mb-5">
-                <div class="col-12">
-                    <div class="card bg-light">
-                        <div class="card-header">
-                            <h4 class="mb-0"><i class="fas fa-question-circle"></i> How It Works</h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-4 text-center mb-3">
-                                    <div class="p-3">
-                                        <i class="fas fa-plus-circle fa-3x text-primary mb-3"></i>
-                                        <h5>1. Submit</h5>
-                                        <p class="text-muted">Community members submit external resources related to DANDI datasets</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 text-center mb-3">
-                                    <div class="p-3">
-                                        <i class="fas fa-search fa-3x text-warning mb-3"></i>
-                                        <h5>2. Review</h5>
-                                        <p class="text-muted">Moderators review submissions for relevance and quality</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 text-center mb-3">
-                                    <div class="p-3">
-                                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                                        <h5>3. Endorse</h5>
-                                        <p class="text-muted">Approved resources are endorsed and made available to the community</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card border-primary">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0"><i class="fas fa-users"></i> For Contributors</h5>
-                        </div>
-                        <div class="card-body">
-                            <p>Share external resources that complement DANDI datasets:</p>
-                            <ul class="list-unstyled">
-                                <li><i class="fas fa-check text-success"></i> Analysis code and notebooks</li>
-                                <li><i class="fas fa-check text-success"></i> Publications and preprints</li>
-                                <li><i class="fas fa-check text-success"></i> Related datasets</li>
-                                <li><i class="fas fa-check text-success"></i> Documentation and tutorials</li>
-                            </ul>
-                            <a href="{{ url_for('submit_form') }}" class="btn btn-primary">
-                                <i class="fas fa-plus"></i> Submit Resource
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card border-warning">
-                        <div class="card-header bg-warning text-dark">
-                            <h5 class="mb-0"><i class="fas fa-gavel"></i> For Moderators</h5>
-                        </div>
-                        <div class="card-body">
-                            <p>Review and endorse community submissions:</p>
-                            <ul class="list-unstyled">
-                                <li><i class="fas fa-check text-success"></i> Verify resource relevance</li>
-                                <li><i class="fas fa-check text-success"></i> Check quality and accuracy</li>
-                                <li><i class="fas fa-check text-success"></i> Endorse valuable contributions</li>
-                                <li><i class="fas fa-check text-success"></i> Help build community trust</li>
-                            </ul>
-                            <a href="{{ url_for('moderate') }}" class="btn btn-warning">
-                                <i class="fas fa-gavel"></i> Moderate Submissions
-                                {% if total_community > 0 %}
-                                <span class="badge bg-dark ms-1">{{ total_community }}</span>
-                                {% endif %}
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
+
+<script>
+function filterDandisets() {
+    const searchInput = document.getElementById('dandisetSearch');
+    const filter = searchInput.value.toLowerCase();
+    const dandisetRows = document.querySelectorAll('.dandiset-row');
+    const noResults = document.getElementById('noResults');
+    let visibleCount = 0;
+
+    dandisetRows.forEach(function(row) {
+        const dandisetId = row.getAttribute('data-dandiset-id');
+        const dandisetText = row.textContent.toLowerCase();
+        
+        if (dandisetId.includes(filter) || dandisetText.includes(filter)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    // Show/hide no results message
+    if (visibleCount === 0 && filter !== '') {
+        noResults.style.display = 'block';
+    } else {
+        noResults.style.display = 'none';
+    }
+}
+</script>
 {% endblock %}

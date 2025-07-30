@@ -86,6 +86,11 @@ def submit_form():
                          relation_options=relation_options,
                          type_options=type_options)
 
+@app.route('/how-it-works')
+def how_it_works():
+    """How it works information page"""
+    return render_template('how_it_works.html')
+
 @app.route('/submit', methods=['POST'])
 def submit_resource():
     """Handle form submission"""
