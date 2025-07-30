@@ -43,11 +43,6 @@ class ExternalResource(Resource):
         title="Endorsement Date",
         description="When this resource was endorsed by a moderator"
     )
-    github_pr_url: Optional[str] = Field(
-        default=None,
-        title="GitHub PR URL",
-        description="Link to the GitHub pull request that added this resource"
-    )
     
     schemaKey: Literal["ExternalResource"] = Field(
         "ExternalResource", validate_default=True, json_schema_extra={"readOnly": True}
