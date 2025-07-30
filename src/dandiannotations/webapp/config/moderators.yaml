@@ -1,0 +1,17 @@
+# Moderator credentials for DANDI External Resources
+# Passwords are hashed using bcrypt
+moderators:
+  admin:
+    username: admin
+    password_hash: $2b$12$r.iX72oIf.OIUQ3c2DD1n.NoexY.FD9wpAWuJsZlHc.zF052DvycG  # password: admin123
+    name: Administrator
+    email: admin@example.com
+  
+  moderator1:
+    username: moderator1
+    password_hash: $2b$12$koa/SpEe/k6Y6RU1ejCEpu/Pls94i2uQg69tWAgZnArQvE4iaX87u  # password: mod123
+    name: Moderator One
+    email: moderator1@example.com
+
+# Note: To generate new password hashes, use:
+# python -c "import bcrypt; print(bcrypt.hashpw('your_password'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))"

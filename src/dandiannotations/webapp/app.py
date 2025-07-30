@@ -3,8 +3,9 @@ Flask web application for DANDI External Resources annotation
 """
 import os
 import sys
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask_session import Session
+from datetime import datetime, timedelta
 import re
 
 # Add the parent directory to the path to import our models
@@ -13,10 +14,21 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from dandiannotations.webapp.utils.yaml_handler import YAMLHandler
 from dandiannotations.webapp.utils.submission_handler import SubmissionHandler
 from dandiannotations.webapp.utils.schema_utils import get_resource_relation_options, get_resource_type_options
+from dandiannotations.webapp.utils.auth import AuthManager, login_required
 from dandiannotations.models.models import ExternalResource, AnnotationContributor
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'
+
+# Session configuration for 24-hour sessions
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_KEY_PREFIX'] = 'dandi_auth:'
+
+# Initialize session
+Session(app)
 
 # Configuration
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'submissions')
@@ -25,6 +37,18 @@ submission_handler = SubmissionHandler(SUBMISSIONS_DIR)
 # Keep old YAML handler for backward compatibility if needed
 YAML_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'external_resources', 'external_resources.yaml')
 yaml_handler = YAMLHandler(YAML_FILE_PATH)
+
+# Authentication configuration
+MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config', 'moderators.yaml')
+auth_manager = AuthManager(MODERATORS_CONFIG_PATH)
+
+@app.context_processor
+def inject_auth_status():
+    """Make authentication status available to all templates"""
+    return {
+        'is_authenticated': auth_manager.is_authenticated(),
+        'current_user': auth_manager.get_current_user()
+    }
 
 def validate_email(email):
     """Basic email validation"""
@@ -228,6 +252,7 @@ def moderate():
         return redirect(url_for('index'))
 
 @app.route('/endorse/<dandiset_id>/<filename>', methods=['GET', 'POST'])
+@login_required
 def endorse_submission(dandiset_id, filename):
     """Endorse a community submission"""
     if request.method == 'GET':
@@ -302,6 +327,50 @@ def endorse_submission(dandiset_id, filename):
         
         # Redirect back to moderation page
         return redirect(url_for('moderate'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page for moderators"""
+    if request.method == 'GET':
+        # Show login form
+        return render_template('login.html')
+    
+    elif request.method == 'POST':
+        # Process login
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return render_template('login.html')
+        
+        # Verify credentials
+        user_info = auth_manager.verify_credentials(username, password)
+        if user_info:
+            auth_manager.login_user(user_info)
+            flash(f'Welcome, {user_info["name"]}!', 'success')
+            
+            # Redirect to next page if specified, otherwise to homepage
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password', 'error')
+            return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Logout current user"""
+    user_info = auth_manager.get_current_user()
+    auth_manager.logout_user()
+    
+    if user_info:
+        flash(f'Goodbye, {user_info["name"]}!', 'success')
+    else:
+        flash('You have been logged out', 'success')
+    
+    return redirect(url_for('index'))
 
 @app.route('/clear', methods=['POST'])
 def clear_form():

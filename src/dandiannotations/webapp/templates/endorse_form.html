@@ -38,6 +38,7 @@
                                        id="moderator_name" 
                                        name="moderator_name" 
                                        required
+                                       value="{{ current_user.name if current_user else '' }}"
                                        placeholder="Your full name">
                             </div>
                             
@@ -50,6 +51,7 @@
                                        id="moderator_email" 
                                        name="moderator_email" 
                                        required
+                                       value="{{ current_user.email if current_user else '' }}"
                                        placeholder="your.email@example.com">
                             </div>
                         </div>
