@@ -5,47 +5,11 @@
     <div class="row">
         <div class="col-12">
             <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2><i class="fas fa-gavel"></i> Moderation Interface</h2>
-                    <p class="text-muted">Review and endorse community submissions</p>
-                </div>
-                <div>
-                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary me-2">
-                        <i class="fas fa-home"></i> Home
-                    </a>
-                    <a href="{{ url_for('submit_form') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Add New Resource
-                    </a>
-                </div>
+            <div class="mb-4">
+                <h2><i class="fas fa-gavel"></i> Moderation Interface</h2>
+                <p class="text-muted">Review and endorse community submissions</p>
             </div>
 
-            <!-- Navigation Section -->
-            {% if all_dandisets and all_dandisets|length > 0 %}
-            <div class="mb-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0"><i class="fas fa-compass"></i> Browse DANDISets with Resources</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            {% for ds in all_dandisets %}
-                            <div class="col-md-4 col-lg-3 mb-2">
-                                <a href="{{ url_for('dandiset_resources', dandiset_id=ds.id) }}" 
-                                   class="btn btn-outline-primary btn-sm w-100">
-                                    <i class="fas fa-database"></i> {{ ds.display_id }}
-                                    <span class="badge bg-secondary ms-1">{{ ds.total_count }}</span>
-                                    {% if ds.community_count > 0 %}
-                                    <span class="badge bg-warning ms-1">{{ ds.community_count }} pending</span>
-                                    {% endif %}
-                                </a>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
             <!-- Summary Stats -->
             <div class="row mb-4">
@@ -151,49 +115,6 @@
                 </div>
             {% endif %}
 
-            <!-- Quick Actions -->
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card bg-light">
-                        <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-tools"></i> Quick Actions</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6>Navigation</h6>
-                                    <ul class="list-unstyled">
-                                        <li><a href="{{ url_for('submit_form') }}" class="text-decoration-none">
-                                            <i class="fas fa-plus"></i> Submit New Resource
-                                        </a></li>
-                                        <li><a href="#" onclick="window.location.reload()" class="text-decoration-none">
-                                            <i class="fas fa-sync"></i> Refresh Page
-                                        </a></li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-6">
-                                    <h6>DANDI Sets with Submissions</h6>
-                                    {% set dandiset_ids = pending_submissions|map(attribute='_dandiset_id')|unique|list %}
-                                    {% if dandiset_ids %}
-                                        <ul class="list-unstyled">
-                                            {% for dandiset_id in dandiset_ids[:5] %}
-                                            <li><a href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id) }}" class="text-decoration-none">
-                                                <i class="fas fa-database"></i> {{ dandiset_id }}
-                                            </a></li>
-                                            {% endfor %}
-                                            {% if dandiset_ids|length > 5 %}
-                                            <li><small class="text-muted">... and {{ dandiset_ids|length - 5 }} more</small></li>
-                                            {% endif %}
-                                        </ul>
-                                    {% else %}
-                                        <p class="text-muted">No DANDI sets with pending submissions</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
