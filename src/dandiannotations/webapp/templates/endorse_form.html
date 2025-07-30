@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-gavel"></i> Endorse Submission
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Submission Details -->
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Submission Details</h6>
+                        <p><strong>Resource Name:</strong> {{ submission.name }}</p>
+                        <p><strong>DANDI Set:</strong> DANDI:{{ submission._dandiset_id.split('_')[1] if '_' in submission._dandiset_id else submission._dandiset_id.zfill(6) }}</p>
+                        <p><strong>URL:</strong> <a href="{{ submission.url }}" target="_blank">{{ submission.url }}</a></p>
+                        <p><strong>Repository:</strong> {{ submission.repository }}</p>
+                        <p><strong>Type:</strong> {{ submission.resourceType }}</p>
+                        <p><strong>Relation:</strong> {{ submission.relation }}</p>
+                        <p><strong>Submitted by:</strong> {{ submission.annotation_contributor.name }} ({{ submission.annotation_contributor.email }})</p>
+                        <p class="mb-0"><strong>Submitted on:</strong> {{ submission.annotation_date[:10] }}</p>
+                    </div>
+
+                    <!-- Endorsement Form -->
+                    <form method="POST" action="{{ url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename) }}">
+                        <h6 class="mb-3"><i class="fas fa-user-check"></i> Moderator Information</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="moderator_name" class="form-label">
+                                    Moderator Name <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="moderator_name" 
+                                       name="moderator_name" 
+                                       required
+                                       placeholder="Your full name">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="moderator_email" class="form-label">
+                                    Moderator Email <span class="text-danger">*</span>
+                                </label>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="moderator_email" 
+                                       name="moderator_email" 
+                                       required
+                                       placeholder="your.email@example.com">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="moderator_identifier" class="form-label">
+                                    ORCID (Optional)
+                                </label>
+                                <input type="url" 
+                                       class="form-control" 
+                                       id="moderator_identifier" 
+                                       name="moderator_identifier" 
+                                       placeholder="https://orcid.org/0000-0000-0000-0000">
+                                <div class="form-text">Your ORCID identifier (if available)</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="moderator_url" class="form-label">
+                                    Website/Profile URL (Optional)
+                                </label>
+                                <input type="url" 
+                                       class="form-control" 
+                                       id="moderator_url" 
+                                       name="moderator_url" 
+                                       placeholder="https://example.com">
+                                <div class="form-text">Your personal or institutional website</div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Important:</strong> By endorsing this submission, you are confirming that:
+                            <ul class="mb-0 mt-2">
+                                <li>The external resource is relevant and valuable to the DANDI community</li>
+                                <li>The resource information appears accurate and complete</li>
+                                <li>The submission follows DANDI guidelines for external resources</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('moderate') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Moderation
+                            </a>
+                            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to endorse this submission?');">
+                                <i class="fas fa-check"></i> Endorse Submission
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

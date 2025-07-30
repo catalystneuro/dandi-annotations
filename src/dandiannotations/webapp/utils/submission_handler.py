@@ -143,13 +143,14 @@ class SubmissionHandler:
         except Exception as e:
             raise Exception(f"Error loading endorsed submissions: {str(e)}")
     
-    def endorse_submission(self, dandiset_id: str, filename: str) -> bool:
+    def endorse_submission(self, dandiset_id: str, filename: str, endorser_info: Dict[str, Any]) -> bool:
         """
-        Move a submission from community to endorsed folder
+        Move a submission from community to endorsed folder and add endorsement information
         
         Args:
             dandiset_id: The dandiset identifier
             filename: The filename of the submission to endorse
+            endorser_info: Information about the person endorsing (name, email, etc.)
             
         Returns:
             True if successful, False otherwise
@@ -167,8 +168,28 @@ class SubmissionHandler:
             if dest_path.exists():
                 raise FileExistsError(f"File already exists in endorsed folder: {filename}")
             
-            # Move the file
-            shutil.move(str(source_path), str(dest_path))
+            # Load the existing submission data
+            with open(source_path, 'r', encoding='utf-8') as file:
+                submission_data = yaml.safe_load(file)
+            
+            # Add endorsement information
+            submission_data['endorsement_contributor'] = {
+                'name': endorser_info.get('name', 'Unknown Moderator'),
+                'email': endorser_info.get('email'),
+                'identifier': endorser_info.get('identifier'),
+                'url': endorser_info.get('url'),
+                'schemaKey': 'AnnotationContributor'
+            }
+            submission_data['endorsement_date'] = datetime.now().isoformat()
+            
+            # Save the updated data to the endorsed folder
+            with open(dest_path, 'w', encoding='utf-8') as file:
+                yaml.dump(submission_data, file, default_flow_style=False, 
+                         allow_unicode=True, sort_keys=False, indent=2)
+            
+            # Remove the original file from community folder
+            source_path.unlink()
+            
             return True
             
         except Exception as e:
@@ -236,3 +257,43 @@ class SubmissionHandler:
         except Exception as e:
             print(f"Error loading submission {filename}: {e}")
             return None
+    
+    def get_all_dandisets(self) -> List[Dict[str, Any]]:
+        """
+        Get all dandisets that have submissions (community or endorsed)
+        
+        Returns:
+            List of dandiset info with submission counts
+        """
+        try:
+            dandisets = []
+            
+            # Iterate through all dandiset directories
+            for dandiset_dir in self.base_dir.iterdir():
+                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                    dandiset_id = dandiset_dir.name
+                    
+                    # Count submissions
+                    community_count = len(self.get_community_submissions(dandiset_id))
+                    endorsed_count = len(self.get_endorsed_submissions(dandiset_id))
+                    total_count = community_count + endorsed_count
+                    
+                    # Only include dandisets that have submissions
+                    if total_count > 0:
+                        # Format display name as DANDI:XXXXXX
+                        display_id = f"DANDI:{dandiset_id.split('_')[1]}"
+                        
+                        dandisets.append({
+                            'id': dandiset_id,
+                            'display_id': display_id,
+                            'community_count': community_count,
+                            'endorsed_count': endorsed_count,
+                            'total_count': total_count
+                        })
+            
+            # Sort by dandiset ID
+            dandisets.sort(key=lambda x: x['id'])
+            return dandisets
+            
+        except Exception as e:
+            raise Exception(f"Error loading dandisets: {str(e)}")

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Hero Section -->
+            <div class="jumbotron bg-primary text-white mb-5 p-5 rounded">
+                <div class="container text-center">
+                    <h1 class="display-4">
+                        <i class="fas fa-database"></i> DANDI External Resources
+                    </h1>
+                    <p class="lead">Community-driven external resources for DANDI datasets</p>
+                    <p class="mb-4">Discover and contribute external resources that complement DANDI datasets. Community submissions are reviewed and endorsed by moderators.</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{{ url_for('submit_form') }}" class="btn btn-light btn-lg">
+                            <i class="fas fa-plus"></i> Submit New Resource
+                        </a>
+                        <a href="{{ url_for('moderate') }}" class="btn btn-outline-light btn-lg">
+                            <i class="fas fa-gavel"></i> Moderate Submissions
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Overview -->
+            <div class="row mb-5">
+                <div class="col-md-3">
+                    <div class="card bg-success text-white text-center">
+                        <div class="card-body">
+                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                            <h3>{{ total_endorsed }}</h3>
+                            <p class="mb-0">Endorsed Resources</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark text-center">
+                        <div class="card-body">
+                            <i class="fas fa-clock fa-2x mb-2"></i>
+                            <h3>{{ total_community }}</h3>
+                            <p class="mb-0">Pending Review</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white text-center">
+                        <div class="card-body">
+                            <i class="fas fa-database fa-2x mb-2"></i>
+                            <h3>{{ total_dandisets }}</h3>
+                            <p class="mb-0">DANDISets with Resources</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-secondary text-white text-center">
+                        <div class="card-body">
+                            <i class="fas fa-link fa-2x mb-2"></i>
+                            <h3>{{ total_endorsed + total_community }}</h3>
+                            <p class="mb-0">Total Resources</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DANDISets Section -->
+            <div class="mb-5">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="fas fa-list"></i> DANDISets with External Resources</h2>
+                    {% if all_dandisets|length > 0 %}
+                    <span class="badge bg-primary">{{ all_dandisets|length }} datasets</span>
+                    {% endif %}
+                </div>
+
+                {% if all_dandisets %}
+                    <div class="row">
+                        {% for dandiset in all_dandisets %}
+                        <div class="col-lg-6 col-xl-4 mb-4">
+                            <div class="card h-100 border-primary">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">{{ dandiset.display_id }}</h5>
+                                    <span class="badge bg-light text-primary">
+                                        {{ dandiset.total_count }} resource{{ 's' if dandiset.total_count != 1 else '' }}
+                                    </span>
+                                </div>
+                                <div class="card-body d-flex flex-column">
+                                    <div class="flex-grow-1">
+                                        <div class="row text-center mb-3">
+                                            <div class="col-6">
+                                                <div class="p-2 bg-success text-white rounded">
+                                                    <i class="fas fa-check-circle"></i>
+                                                    <div class="h4 mb-0">{{ dandiset.endorsed_count }}</div>
+                                                    <small>Endorsed</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="p-2 bg-warning text-dark rounded">
+                                                    <i class="fas fa-clock"></i>
+                                                    <div class="h4 mb-0">{{ dandiset.community_count }}</div>
+                                                    <small>Pending</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if dandiset.endorsed_count > 0 %}
+                                        <p class="text-success mb-1">
+                                            <i class="fas fa-check-circle"></i>
+                                            {{ dandiset.endorsed_count }} endorsed resource{{ 's' if dandiset.endorsed_count != 1 else '' }}
+                                        </p>
+                                        {% endif %}
+                                        
+                                        {% if dandiset.community_count > 0 %}
+                                        <p class="text-warning mb-1">
+                                            <i class="fas fa-clock"></i>
+                                            {{ dandiset.community_count }} pending review
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mt-3">
+                                        <a href="{{ url_for('dandiset_resources', dandiset_id=dandiset.id) }}" 
+                                           class="btn btn-primary w-100">
+                                            <i class="fas fa-eye"></i> View Resources
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                                <h4 class="text-muted">No External Resources Yet</h4>
+                                <p class="text-muted mb-4">Be the first to contribute external resources to the DANDI community!</p>
+                                <a href="{{ url_for('submit_form') }}" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-plus"></i> Submit First Resource
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- How It Works Section -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card bg-light">
+                        <div class="card-header">
+                            <h4 class="mb-0"><i class="fas fa-question-circle"></i> How It Works</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center mb-3">
+                                    <div class="p-3">
+                                        <i class="fas fa-plus-circle fa-3x text-primary mb-3"></i>
+                                        <h5>1. Submit</h5>
+                                        <p class="text-muted">Community members submit external resources related to DANDI datasets</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center mb-3">
+                                    <div class="p-3">
+                                        <i class="fas fa-search fa-3x text-warning mb-3"></i>
+                                        <h5>2. Review</h5>
+                                        <p class="text-muted">Moderators review submissions for relevance and quality</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center mb-3">
+                                    <div class="p-3">
+                                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                        <h5>3. Endorse</h5>
+                                        <p class="text-muted">Approved resources are endorsed and made available to the community</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-users"></i> For Contributors</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Share external resources that complement DANDI datasets:</p>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> Analysis code and notebooks</li>
+                                <li><i class="fas fa-check text-success"></i> Publications and preprints</li>
+                                <li><i class="fas fa-check text-success"></i> Related datasets</li>
+                                <li><i class="fas fa-check text-success"></i> Documentation and tutorials</li>
+                            </ul>
+                            <a href="{{ url_for('submit_form') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Submit Resource
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-gavel"></i> For Moderators</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Review and endorse community submissions:</p>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> Verify resource relevance</li>
+                                <li><i class="fas fa-check text-success"></i> Check quality and accuracy</li>
+                                <li><i class="fas fa-check text-success"></i> Endorse valuable contributions</li>
+                                <li><i class="fas fa-check text-success"></i> Help build community trust</li>
+                            </ul>
+                            <a href="{{ url_for('moderate') }}" class="btn btn-warning">
+                                <i class="fas fa-gavel"></i> Moderate Submissions
+                                {% if total_community > 0 %}
+                                <span class="badge bg-dark ms-1">{{ total_community }}</span>
+                                {% endif %}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

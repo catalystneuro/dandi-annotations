@@ -33,6 +33,16 @@ class ExternalResource(Resource):
         title="Annotation Date", 
         description="When this resource annotation was created"
     )
+    endorsement_contributor: Optional[AnnotationContributor] = Field(
+        default=None,
+        title="Endorsement Contributor",
+        description="Person or organization who endorsed this resource"
+    )
+    endorsement_date: Optional[datetime] = Field(
+        default=None,
+        title="Endorsement Date",
+        description="When this resource was endorsed by a moderator"
+    )
     github_pr_url: Optional[str] = Field(
         default=None,
         title="GitHub PR URL",
