@@ -83,12 +83,10 @@ def test_article_dandi_detection():
             
             print(f"\n{i+1}. {title}")
             print(f"   DOI: {doi}")
+            print(f"   PMID: {article.get('pmid', 'No PMID')}")
             print(f"   {'-'*50}")
 
             full_text = article.get('full_text', '')
-            if doi == "10.1038/s41586-020-03171-x":
-                print(f"{full_text = }")
-                assert False
             contexts = find_dandi_context_windows(full_text)
             
             # Also check tables for DANDI mentions
@@ -111,7 +109,8 @@ def test_article_dandi_detection():
                 print(f"  {i+1}. [TABLE] \"{ctx['context']}\"")
             
             if not contexts and not table_contexts:
-                print("  No DANDI mentions found in full text or tables.")
+                print("  No DANDI mentions found in full text.")
+                print(f"{full_text = }")
 
 
 if __name__ == "__main__":
