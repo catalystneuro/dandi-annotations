@@ -650,18 +650,17 @@ class NcbiAPI:
         
         return boxed_texts
 
-# Example usage for DANDI research
-def search_dandi_articles():
+def search_dandi_articles(verbose: bool = False) -> list[dict]:
     # Initialize API (replace with your email)
     api = NcbiAPI(email="paul.wesley.adkisson@gmail.com")
     
     # Search queries for DANDI-related articles
     database_to_queries = {
-        "pubmed": [
-            '"DANDI Archive"[tiab:~0]',
-            '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
-            '"DANDI:"[tiab:~0]',
-        ],
+        # "pubmed": [
+        #     '"DANDI Archive"[tiab:~0]',
+        #     '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
+        #     '"DANDI:"[tiab:~0]',
+        # ],
         "pmc": [
             '"DANDI Archive"',
             '"Distributed Archives for Neurophysiology Data Integration"',
@@ -670,19 +669,23 @@ def search_dandi_articles():
     all_articles = []
 
     for database, queries in database_to_queries.items():
-        print(f"Searching {database} for DANDI-related articles...")
+        if verbose:
+            print(f"Searching {database} for DANDI-related articles...")
 
         for query in queries:
             pmids = api.get_pmids(query, max_results=100, database=database)
-            print(f"Found {len(pmids)} articles for query: {query}")
+            if verbose:
+                print(f"Found {len(pmids)} articles for query: {query}")
 
             if pmids:
                 articles = api.get_article_details(pmids, database=database)
                 all_articles.extend(articles)
-                print(f"Retrieved details for {len(articles)} articles.")
+                if verbose:
+                    print(f"Retrieved details for {len(articles)} articles.")
             else:
-                print("No articles found for this query.")
-        
+                if verbose:
+                    print("No articles found for this query.")
+
             # Rate limiting - be nice to NCBI servers
             time.sleep(1)
     
@@ -711,8 +714,14 @@ def extract_dandisets_from_articles(articles):
     dandiset_pattern = re.compile(
         r"(?:https?://)?(?:www\.|gui\.)?dandiarchive\.org/(?:dandiset/|#/?dandiset/)(\d{6})(?:/draft)?"
         r"|DANDI:?(\d{6})"
-        r"|DANDI\s+Archive\s+ID:\s*(\d{6})",
-        re.IGNORECASE
+        r"|DANDI\s+Archive\s+ID:\s*(\d{6})"
+        r"|(?:https?://doi\.org/)?10\.\d+/dandi\.(\d{6})/[\d\.]+|"
+        r"dataset\s+number\s+(\d{6})|"
+        r"DANDI\s+Archive.*?dataset\s+number\s+(\d{6})|"
+        r"dandiarchive\.org.*?dataset\s+number\s+(\d{6})|"
+        r"DANDI\s+archive\d*\.?\s*(\d{6})|"
+        r"available\s+in\s+the\s+DANDI\s+archive\d*\.?\s*(\d{6})",
+        re.IGNORECASE | re.DOTALL
     )
     for article in articles:
         dandisets = set()
@@ -720,7 +729,9 @@ def extract_dandisets_from_articles(articles):
         full_text = article.get("full_text")
         if full_text is not None:
             for match in dandiset_pattern.finditer(full_text):
-                ds_id = match.group(1) or match.group(2) or match.group(3)
+                ds_id = (match.group(1) or match.group(2) or match.group(3) or 
+                        match.group(4) or match.group(5) or match.group(6) or 
+                        match.group(7) or match.group(8) or match.group(9))
                 if ds_id:
                     dandisets.add(ds_id)
         # Check tables for Dandiset IDs
@@ -730,7 +741,9 @@ def extract_dandisets_from_articles(articles):
                 for cell in row:
                     if cell:
                         for match in dandiset_pattern.finditer(cell):
-                            ds_id = match.group(1) or match.group(2) or match.group(3)
+                            ds_id = (match.group(1) or match.group(2) or match.group(3) or 
+                                    match.group(4) or match.group(5) or match.group(6) or 
+                                    match.group(7) or match.group(8) or match.group(9))
                             if ds_id:
                                 dandisets.add(ds_id)
         article["dandisets"] = sorted(dandisets)
@@ -739,8 +752,11 @@ def extract_dandisets_from_articles(articles):
 # Example execution
 if __name__ == "__main__":
     # Search for DANDI-related articles
-    articles = search_dandi_articles()
+    articles = search_dandi_articles(verbose=True)
     articles = extract_dandisets_from_articles(articles=articles)
+
+    for article in articles:
+        assert article["full_text"], f"Article {article['pmid']} has no full text available."
 
     print(f"\nFound {len(articles)} articles likely referencing datasets:")
 
