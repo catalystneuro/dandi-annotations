@@ -4,6 +4,7 @@ from urllib.parse import quote
 import time
 import json
 from typing import Literal
+import re
 
 class NcbiAPI:
     def __init__(self, email=None, api_key=None):
@@ -73,7 +74,7 @@ class NcbiAPI:
             'db': database,
             'id': ','.join(pmids),
             'retmode': 'xml',
-            'rettype': 'abstract'
+            'rettype': 'full',
         }
         
         if self.email:
@@ -238,6 +239,124 @@ class NcbiAPI:
                     ref_text = ET.tostring(ref, encoding='unicode', method='text')
                     references.append(ref_text.strip())
                 
+                # Also extract from floats-group (figures, tables, etc.)
+                floats_content = {
+                    'figures': [],
+                    'tables': [],
+                    'boxed_text': [],
+                    'supplementary': []
+                }
+                
+                floats_group = article.find('.//floats-group')
+                
+                # Extract figures
+                for fig in floats_group.findall('.//fig'):
+                    figure_data = {
+                        'id': fig.get('id'),
+                        'label': '',
+                        'title': '',
+                        'caption': '',
+                        'graphic_href': ''
+                    }
+                    
+                    # Figure label
+                    label_elem = fig.find('.//label')
+                    if label_elem is not None:
+                        figure_data['label'] = label_elem.text
+                    
+                    # Figure title and caption
+                    caption_elem = fig.find('.//caption')
+                    if caption_elem is not None:
+                        title_elem = caption_elem.find('.//title')
+                        if title_elem is not None:
+                            figure_data['title'] = title_elem.text
+
+                        # Extract all caption paragraphs
+                        caption_parts = []
+                        for p in caption_elem.findall('.//p'):
+                            caption_parts.append(p.text)
+                        figure_data['caption'] = ' '.join(caption_parts)
+                    
+                    # Graphic file reference
+                    graphic_elem = fig.find('.//graphic')
+                    if graphic_elem is not None:
+                        href = graphic_elem.get('{http://www.w3.org/1999/xlink}href')
+                        if href:
+                            figure_data['graphic_href'] = href
+                    
+                    floats_content['figures'].append(figure_data)
+                
+                # Extract tables
+                for table_wrap in floats_group.findall('.//table-wrap'):
+                    table_data = {
+                        'id': table_wrap.get('id'),
+                        'label': '',
+                        'caption': '',
+                        'headers': [],
+                        'rows': []
+                    }
+                    
+                    # Table label
+                    label_elem = table_wrap.find('.//label')
+                    if label_elem is not None:
+                        table_data['label'] = label_elem.text
+
+                    # Table caption
+                    caption_elem = table_wrap.find('.//caption')
+                    if caption_elem is not None:
+                        table_data['caption'] = caption_elem.text
+
+                    # Extract table headers
+                    table_elem = table_wrap.find('.//table')
+                    if table_elem is not None:
+                        # Headers
+                        for th in table_elem.findall('.//thead//th'):
+                            header_text = th.text
+                            if header_text is not None:
+                                table_data['headers'].append(header_text)
+                        
+                        # Table rows
+                        for tr in table_elem.findall('.//tbody//tr'):
+                            row_data = []
+                            for td in tr.findall('.//td'):
+                                cell_text = td.text
+                                if cell_text is not None:
+                                    row_data.append(cell_text.strip())
+                            if any(cell.strip() for cell in row_data):  # Skip empty rows
+                                table_data['rows'].append(row_data)
+                    
+                    floats_content['tables'].append(table_data)
+                
+                # Extract boxed text (highlights, key points, etc.)
+                for boxed in floats_group.findall('.//boxed-text'):
+                    boxed_data = {
+                        'id': boxed.get('id'),
+                        'title': '',
+                        'content': []
+                    }
+                    
+                    # Boxed text title
+                    caption_elem = boxed.find('.//caption')
+                    if caption_elem is not None:
+                        title_elem = caption_elem.find('.//title')
+                        if title_elem is not None:
+                            boxed_data['title'] = title_elem.text
+
+                    # Extract list items or paragraphs
+                    for list_item in boxed.findall('.//list-item'):
+                        item_text = list_item.text
+                        if item_text is not None:
+                            boxed_data['content'].append(item_text)
+                    
+                    # If no list items, try paragraphs
+                    if not boxed_data['content']:
+                        for p in boxed.findall('.//p'):
+                            para_text = p.text
+                            if para_text is not None:
+                                boxed_data['content'].append(para_text)
+                    
+                    floats_content['boxed_text'].append(boxed_data)
+                
                 articles.append({
                     'pmc_id': pmc_id,
                     'pmid': pmid,
@@ -248,7 +367,11 @@ class NcbiAPI:
                     'journal': journal,
                     'year': year,
                     'doi': doi,
-                    'references': references
+                    'references': references,
+                    'figures': floats_content['figures'],
+                    'tables': floats_content['tables'],
+                    'boxed_text': floats_content['boxed_text'],
+                    'supplementary': floats_content['supplementary'],
                 })
                 
             except Exception as e:
@@ -264,14 +387,14 @@ def search_dandi_articles():
     
     # Search queries for DANDI-related articles
     database_to_queries = {
-        "pubmed": [
-            '"DANDI Archive"[tiab:~0]',
-            '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
-            '"DANDI:"[tiab:~0]',
-        ],
+        # "pubmed": [
+        #     '"DANDI Archive"[tiab:~0]',
+        #     '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
+        #     '"DANDI:"[tiab:~0]',
+        # ],
         "pmc": [
             '"DANDI Archive"',
-            '"Distributed Archives for Neurophysiology Data Integration"',
+            # '"Distributed Archives for Neurophysiology Data Integration"',
         ]
     }
     all_articles = []
@@ -281,6 +404,7 @@ def search_dandi_articles():
 
         for query in queries:
             pmids = api.search(query, max_results=100, database=database)
+            pmids = ['11265976']
             print(f"Found {len(pmids)} articles for query: {query}")
 
             if pmids:
@@ -295,10 +419,59 @@ def search_dandi_articles():
     
     return all_articles
 
+def extract_dandisets_from_articles(articles):
+    """
+    For each article, search the full_text (if present) for Dandiset IDs or URLs.
+
+    The Dandiset ID can be in various formats:
+    - https://dandiarchive.org/dandiset/123456
+    - https://gui.dandiarchive.org/#/dandiset/123456
+    - DANDI:123456
+    - DANDI Archive ID: 123456
+
+    Parameters
+    ----------
+    articles : list[dict]
+        List of article dictionaries, possibly with 'full_text' key.
+
+    Returns
+    -------
+    list[dict]
+        List of article dicts, each with a new key 'dandisets' (list of found Dandiset IDs/URLs).
+    """
+    dandiset_pattern = re.compile(
+        r"(?:https?://)?(?:www\.|gui\.)?dandiarchive\.org/(?:dandiset/|#/?dandiset/)(\d{6})(?:/draft)?"
+        r"|DANDI:?(\d{6})"
+        r"|DANDI\s+Archive\s+ID:\s*(\d{6})",
+        re.IGNORECASE
+    )
+    for article in articles:
+        dandisets = set()
+        # Check full_text for Dandiset IDs
+        full_text = article.get("full_text")
+        if full_text is not None:
+            for match in dandiset_pattern.finditer(full_text):
+                ds_id = match.group(1) or match.group(2) or match.group(3)
+                if ds_id:
+                    dandisets.add(ds_id)
+        # Check tables for Dandiset IDs
+        for table in article.get("tables", []):
+            # Check rows
+            for row in table.get("rows", []):
+                for cell in row:
+                    if cell:
+                        for match in dandiset_pattern.finditer(cell):
+                            ds_id = match.group(1) or match.group(2) or match.group(3)
+                            if ds_id:
+                                dandisets.add(ds_id)
+        article["dandisets"] = sorted(dandisets)
+    return articles
+
 # Example execution
 if __name__ == "__main__":
     # Search for DANDI-related articles
     articles = search_dandi_articles()
+    articles = extract_dandisets_from_articles(articles=articles)
 
     print(f"\nFound {len(articles)} articles likely referencing datasets:")
 
@@ -309,3 +482,8 @@ if __name__ == "__main__":
         print(f"PMID: {article['pmid']}")
         if article['doi']:
             print(f"DOI: {article['doi']}")
+        if 'dandisets' in article:
+            print(f"DANDI Sets: {', '.join(article['dandisets'])}")
+        if 'full_text' in article:
+            print(f"Full Text: {article['full_text'][-50:]}")
+        print(article["tables"])
