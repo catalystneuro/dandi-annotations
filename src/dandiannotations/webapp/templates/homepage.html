@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'pagination.html' import render_pagination %}
 
 {% block content %}
 <div class="container-fluid">
@@ -89,6 +90,9 @@
                         </div>
                     </div>
 
+                    <!-- Pagination (top) -->
+                    {{ render_pagination(pagination, 'index') }}
+
                     <!-- DANDISets List -->
                     <div class="card">
                         <div class="card-header bg-light">
@@ -151,6 +155,9 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Pagination (bottom) -->
+                    {{ render_pagination(pagination, 'index') }}
 
                     <!-- No Results Message (hidden by default) -->
                     <div id="noResults" class="alert alert-info mt-3" style="display: none;">

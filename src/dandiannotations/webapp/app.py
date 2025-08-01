@@ -79,7 +79,14 @@ def validate_dandiset_id(dandiset_id):
 def index():
     """Homepage showing all dandisets with submission counts"""
     try:
-        # Get all dandisets with their submission counts
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = 10  # 10 dandisets per page
+        
+        # Get paginated dandisets with their submission counts
+        paginated_dandisets, pagination_info = submission_handler.get_all_dandisets_paginated(page, per_page)
+        
+        # Get all dandisets for total statistics (not paginated)
         all_dandisets = submission_handler.get_all_dandisets()
         
         # Calculate total statistics
@@ -88,7 +95,8 @@ def index():
         total_dandisets = len(all_dandisets)
         
         return render_template('homepage.html',
-                             all_dandisets=all_dandisets,
+                             all_dandisets=paginated_dandisets,
+                             pagination=pagination_info,
                              total_community=total_community,
                              total_endorsed=total_endorsed,
                              total_dandisets=total_dandisets)
@@ -96,6 +104,7 @@ def index():
         flash(f'Error loading homepage: {str(e)}', 'error')
         return render_template('homepage.html',
                              all_dandisets=[],
+                             pagination={'page': 1, 'total_pages': 1, 'has_prev': False, 'has_next': False},
                              total_community=0,
                              total_endorsed=0,
                              total_dandisets=0)
@@ -214,9 +223,16 @@ def success():
 def dandiset_resources(dandiset_id):
     """Display resources for a specific dandiset"""
     try:
-        # Get both community and endorsed submissions
-        community_submissions = submission_handler.get_community_submissions(dandiset_id)
-        endorsed_submissions = submission_handler.get_endorsed_submissions(dandiset_id)
+        # Get pagination parameters
+        endorsed_page = request.args.get('endorsed_page', 1, type=int)
+        community_page = request.args.get('community_page', 1, type=int)
+        per_page = 9  # 9 resources per page for 3x3 grid
+        
+        # Get paginated submissions
+        community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
+            dandiset_id, community_page, per_page)
+        endorsed_submissions, endorsed_pagination = submission_handler.get_endorsed_submissions_paginated(
+            dandiset_id, endorsed_page, per_page)
         
         # Get all dandisets for navigation
         all_dandisets = submission_handler.get_all_dandisets()
@@ -229,6 +245,8 @@ def dandiset_resources(dandiset_id):
                              display_id=display_id,
                              community_submissions=community_submissions,
                              endorsed_submissions=endorsed_submissions,
+                             community_pagination=community_pagination,
+                             endorsed_pagination=endorsed_pagination,
                              all_dandisets=all_dandisets)
     except Exception as e:
         flash(f'Error loading resources: {str(e)}', 'error')
@@ -238,14 +256,19 @@ def dandiset_resources(dandiset_id):
 def moderate():
     """Moderation interface for all pending submissions"""
     try:
-        # Get all pending community submissions across all dandisets
-        pending_submissions = submission_handler.get_all_pending_submissions()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = 9  # 9 submissions per page for 3x3 grid
+        
+        # Get paginated pending community submissions across all dandisets
+        pending_submissions, pagination_info = submission_handler.get_all_pending_submissions_paginated(page, per_page)
         
         # Get all dandisets for navigation
         all_dandisets = submission_handler.get_all_dandisets()
         
         return render_template('moderation.html',
                              pending_submissions=pending_submissions,
+                             pagination=pagination_info,
                              all_dandisets=all_dandisets)
     except Exception as e:
         flash(f'Error loading pending submissions: {str(e)}', 'error')

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'pagination.html' import render_dual_pagination %}
 
 {% block content %}
 <div class="container-fluid">
@@ -27,6 +28,44 @@
                 </h3>
                 
                 {% if endorsed_submissions %}
+                    <!-- Endorsed Resources Pagination (top) -->
+                    {% if endorsed_pagination.total_pages > 1 %}
+                    <div class="mb-3">
+                        <nav aria-label="Endorsed resources pagination">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-muted small">
+                                    Showing {{ endorsed_pagination.start_item }}-{{ endorsed_pagination.end_item }} of {{ endorsed_pagination.total_items }} endorsed resources
+                                </div>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item {% if not endorsed_pagination.has_prev %}disabled{% endif %}">
+                                        {% if endorsed_pagination.has_prev %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, endorsed_page=endorsed_pagination.prev_page, community_page=request.args.get('community_page', 1)) }}">‹</a>
+                                        {% else %}
+                                            <span class="page-link">‹</span>
+                                        {% endif %}
+                                    </li>
+                                    {% for page_num in range(1, endorsed_pagination.total_pages + 1) %}
+                                        <li class="page-item {% if page_num == endorsed_pagination.page %}active{% endif %}">
+                                            {% if page_num == endorsed_pagination.page %}
+                                                <span class="page-link">{{ page_num }}</span>
+                                            {% else %}
+                                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, endorsed_page=page_num, community_page=request.args.get('community_page', 1)) }}">{{ page_num }}</a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                    <li class="page-item {% if not endorsed_pagination.has_next %}disabled{% endif %}">
+                                        {% if endorsed_pagination.has_next %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, endorsed_page=endorsed_pagination.next_page, community_page=request.args.get('community_page', 1)) }}">›</a>
+                                        {% else %}
+                                            <span class="page-link">›</span>
+                                        {% endif %}
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
+                    </div>
+                    {% endif %}
+
                     <div class="row">
                         {% for resource in endorsed_submissions %}
                         <div class="col-lg-6 col-xl-4 mb-3">
@@ -93,6 +132,44 @@
                         <i class="fas fa-exclamation-triangle"></i>
                         <strong>Note:</strong> These resources are pending review and have not yet been endorsed by moderators.
                     </div>
+                    
+                    <!-- Community Submissions Pagination (top) -->
+                    {% if community_pagination.total_pages > 1 %}
+                    <div class="mb-3">
+                        <nav aria-label="Community submissions pagination">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-muted small">
+                                    Showing {{ community_pagination.start_item }}-{{ community_pagination.end_item }} of {{ community_pagination.total_items }} community submissions
+                                </div>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item {% if not community_pagination.has_prev %}disabled{% endif %}">
+                                        {% if community_pagination.has_prev %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.prev_page, endorsed_page=request.args.get('endorsed_page', 1)) }}">‹</a>
+                                        {% else %}
+                                            <span class="page-link">‹</span>
+                                        {% endif %}
+                                    </li>
+                                    {% for page_num in range(1, community_pagination.total_pages + 1) %}
+                                        <li class="page-item {% if page_num == community_pagination.page %}active{% endif %}">
+                                            {% if page_num == community_pagination.page %}
+                                                <span class="page-link">{{ page_num }}</span>
+                                            {% else %}
+                                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=page_num, endorsed_page=request.args.get('endorsed_page', 1)) }}">{{ page_num }}</a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                    <li class="page-item {% if not community_pagination.has_next %}disabled{% endif %}">
+                                        {% if community_pagination.has_next %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.next_page, endorsed_page=request.args.get('endorsed_page', 1)) }}">›</a>
+                                        {% else %}
+                                            <span class="page-link">›</span>
+                                        {% endif %}
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
+                    </div>
+                    {% endif %}
                     
                     <div class="row">
                         {% for resource in community_submissions %}

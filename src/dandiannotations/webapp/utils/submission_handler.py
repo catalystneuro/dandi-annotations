@@ -4,8 +4,9 @@ Submission handling utilities for the two-tiered external resources system
 import os
 import yaml
 import shutil
+import math
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 
 class SubmissionHandler:
@@ -297,3 +298,102 @@ class SubmissionHandler:
             
         except Exception as e:
             raise Exception(f"Error loading dandisets: {str(e)}")
+    
+    def _paginate_list(self, items: List[Any], page: int = 1, per_page: int = 10) -> Tuple[List[Any], Dict[str, Any]]:
+        """
+        Paginate a list of items and return pagination metadata
+        
+        Args:
+            items: List of items to paginate
+            page: Current page number (1-based)
+            per_page: Number of items per page
+            
+        Returns:
+            Tuple of (paginated_items, pagination_info)
+        """
+        total_items = len(items)
+        total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
+        
+        # Ensure page is within valid range
+        page = max(1, min(page, total_pages))
+        
+        # Calculate start and end indices
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        # Get paginated items
+        paginated_items = items[start_idx:end_idx]
+        
+        # Create pagination info
+        pagination_info = {
+            'page': page,
+            'per_page': per_page,
+            'total_items': total_items,
+            'total_pages': total_pages,
+            'has_prev': page > 1,
+            'has_next': page < total_pages,
+            'prev_page': page - 1 if page > 1 else None,
+            'next_page': page + 1 if page < total_pages else None,
+            'start_item': start_idx + 1 if total_items > 0 else 0,
+            'end_item': min(end_idx, total_items)
+        }
+        
+        return paginated_items, pagination_info
+    
+    def get_all_dandisets_paginated(self, page: int = 1, per_page: int = 10) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Get paginated dandisets that have submissions
+        
+        Args:
+            page: Current page number (1-based)
+            per_page: Number of dandisets per page
+            
+        Returns:
+            Tuple of (paginated_dandisets, pagination_info)
+        """
+        all_dandisets = self.get_all_dandisets()
+        return self._paginate_list(all_dandisets, page, per_page)
+    
+    def get_community_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Get paginated community submissions for a dandiset
+        
+        Args:
+            dandiset_id: The dandiset identifier
+            page: Current page number (1-based)
+            per_page: Number of submissions per page
+            
+        Returns:
+            Tuple of (paginated_submissions, pagination_info)
+        """
+        all_submissions = self.get_community_submissions(dandiset_id)
+        return self._paginate_list(all_submissions, page, per_page)
+    
+    def get_endorsed_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Get paginated endorsed submissions for a dandiset
+        
+        Args:
+            dandiset_id: The dandiset identifier
+            page: Current page number (1-based)
+            per_page: Number of submissions per page
+            
+        Returns:
+            Tuple of (paginated_submissions, pagination_info)
+        """
+        all_submissions = self.get_endorsed_submissions(dandiset_id)
+        return self._paginate_list(all_submissions, page, per_page)
+    
+    def get_all_pending_submissions_paginated(self, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Get paginated pending community submissions across all dandisets
+        
+        Args:
+            page: Current page number (1-based)
+            per_page: Number of submissions per page
+            
+        Returns:
+            Tuple of (paginated_submissions, pagination_info)
+        """
+        all_submissions = self.get_all_pending_submissions()
+        return self._paginate_list(all_submissions, page, per_page)
