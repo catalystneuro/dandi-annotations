@@ -66,22 +66,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Form auto-save to localStorage (optional feature)
-    const formInputs = form ? form.querySelectorAll('input, select, textarea') : [];
-    formInputs.forEach(input => {
-        // Load saved value
-        const savedValue = localStorage.getItem('dandi_form_' + input.name);
-        if (savedValue && input.type !== 'submit') {
-            input.value = savedValue;
-        }
-
-        // Save on change
-        input.addEventListener('change', function() {
-            if (this.type !== 'submit') {
-                localStorage.setItem('dandi_form_' + this.name, this.value);
-            }
-        });
-    });
+    // Clear any existing form data from localStorage for security
+    clearAllFormData();
 });
 
 // Clear form function
@@ -91,13 +77,11 @@ function clearForm() {
         form.reset();
         form.classList.remove('was-validated');
         
-        // Clear localStorage
-        const formInputs = form.querySelectorAll('input, select, textarea');
-        formInputs.forEach(input => {
-            localStorage.removeItem('dandi_form_' + input.name);
-        });
+        // Clear all form data from localStorage
+        clearAllFormData();
         
         // Clear custom validity messages
+        const formInputs = form.querySelectorAll('input, select, textarea');
         formInputs.forEach(input => {
             input.setCustomValidity('');
         });
@@ -174,3 +158,25 @@ document.addEventListener('keydown', function(event) {
         clearForm();
     }
 });
+
+// Clear all form data from localStorage for security
+function clearAllFormData() {
+    // Clear all dandi form data from localStorage
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('dandi_form_') || key === 'dandi_last_user')) {
+            keysToRemove.push(key);
+        }
+    }
+    
+    keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+    });
+    
+    // Also clear session storage
+    sessionStorage.removeItem('dandi_session_id');
+}
+
+// Expose clear function globally for use by logout buttons
+window.dandiClearFormDataOnLogout = clearAllFormData;
