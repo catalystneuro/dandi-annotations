@@ -57,7 +57,7 @@
                                 <li><h6 class="dropdown-header">Moderator</h6></li>
                                 <li><span class="dropdown-item-text">{{ current_user.email }}</span></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}" onclick="if(window.dandiClearFormDataOnLogout) window.dandiClearFormDataOnLogout();">
                                     <i class="fas fa-sign-out-alt"></i> Logout
                                 </a></li>
                             </ul>
