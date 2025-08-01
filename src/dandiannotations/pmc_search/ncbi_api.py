@@ -112,10 +112,6 @@ class NcbiAPI:
             article_data = {
                 'pmid': self._extract_pubmed_pmid(article),
                 'title': self._extract_pubmed_title(article),
-                'abstract': self._extract_pubmed_abstract(article),
-                'authors': self._extract_pubmed_authors(article),
-                'journal': self._extract_pubmed_journal(article),
-                'year': self._extract_pubmed_year(article),
                 'doi': self._extract_pubmed_doi(article),
             }
             
@@ -301,14 +297,14 @@ def search_dandi_articles(verbose: bool = False) -> list[dict]:
     
     # Search queries for DANDI-related articles
     database_to_queries = {
-        # "pubmed": [
-        #     '"DANDI Archive"[tiab:~0]',
-        #     '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
-        #     '"DANDI:"[tiab:~0]',
-        # ],
+        "pubmed": [
+            '"DANDI Archive"[tiab:~0]',
+            '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
+            '"DANDI:"[tiab:~0]',
+        ],
         "pmc": [
             '"DANDI Archive"',
-            # '"Distributed Archives for Neurophysiology Data Integration"',
+            '"Distributed Archives for Neurophysiology Data Integration"',
         ]
     }
     all_articles = []
@@ -404,14 +400,37 @@ def has_full_text(article: dict) -> bool:
         return False
     return True
 
+def deduplicate_articles(articles: list[dict]) -> list[dict]:
+    """
+    Deduplicate articles based on title.
+
+    Parameters
+    ----------
+    articles : list[dict]
+        List of article dictionaries.
+
+    Returns
+    -------
+    list[dict]
+        List of deduplicated articles.
+    """
+    seen = set()
+    deduped_articles = []
+    
+    for article in articles:
+        title = article.get('title').lower()
+        if title not in seen:
+            seen.add(title)
+            deduped_articles.append(article)
+
+    return deduped_articles
+
 # Example execution
 if __name__ == "__main__":
     # Search for DANDI-related articles
     articles = search_dandi_articles(verbose=True)
     articles = extract_dandisets_from_articles(articles=articles)
-
-    for article in articles:
-        assert article["full_text"], f"Article {article['pmid']} has no full text available."
+    articles = deduplicate_articles(articles=articles)
 
     print(f"\nFound {len(articles)} articles likely referencing datasets:")
 
