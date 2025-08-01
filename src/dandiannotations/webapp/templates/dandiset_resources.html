@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'pagination.html' import render_dual_pagination %}
 
 {% block content %}
 <div class="container-fluid">
@@ -8,7 +9,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2>External Resources for {{ display_id }}</h2>
-                    <p class="text-muted">Community and endorsed external resources for this DANDI set</p>
+                    <p class="text-muted">Community and approved external resources for this DANDI set</p>
                 </div>
                 <div>
                     <a href="{{ url_for('submit_form') }}" class="btn btn-primary">
@@ -18,23 +19,61 @@
             </div>
 
 
-            <!-- Endorsed Resources Section -->
+            <!-- Approved Resources Section -->
             <div class="mb-5">
                 <h3 class="mb-3">
                     <i class="fas fa-check-circle text-success"></i> 
-                    Endorsed Resources
-                    <span class="badge bg-success">{{ endorsed_submissions|length }}</span>
+                    Approved Resources
+                    <span class="badge bg-success">{{ approved_pagination.total_items }}</span>
                 </h3>
                 
-                {% if endorsed_submissions %}
+                {% if approved_submissions %}
+                    <!-- Approved Resources Pagination (top) -->
+                    {% if approved_pagination.total_pages > 1 %}
+                    <div class="mb-3">
+                        <nav aria-label="Approved resources pagination">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-muted small">
+                                    Showing {{ approved_pagination.start_item }}-{{ approved_pagination.end_item }} of {{ approved_pagination.total_items }} approved resources
+                                </div>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item {% if not approved_pagination.has_prev %}disabled{% endif %}">
+                                        {% if approved_pagination.has_prev %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, approved_page=approved_pagination.prev_page, community_page=request.args.get('community_page', 1)) }}">‹</a>
+                                        {% else %}
+                                            <span class="page-link">‹</span>
+                                        {% endif %}
+                                    </li>
+                                    {% for page_num in range(1, approved_pagination.total_pages + 1) %}
+                                        <li class="page-item {% if page_num == approved_pagination.page %}active{% endif %}">
+                                            {% if page_num == approved_pagination.page %}
+                                                <span class="page-link">{{ page_num }}</span>
+                                            {% else %}
+                                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, approved_page=page_num, community_page=request.args.get('community_page', 1)) }}">{{ page_num }}</a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                    <li class="page-item {% if not approved_pagination.has_next %}disabled{% endif %}">
+                                        {% if approved_pagination.has_next %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, approved_page=approved_pagination.next_page, community_page=request.args.get('community_page', 1)) }}">›</a>
+                                        {% else %}
+                                            <span class="page-link">›</span>
+                                        {% endif %}
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
+                    </div>
+                    {% endif %}
+
                     <div class="row">
-                        {% for resource in endorsed_submissions %}
+                        {% for resource in approved_submissions %}
                         <div class="col-lg-6 col-xl-4 mb-3">
                             <div class="card border-success">
                                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                                     <h6 class="mb-0">{{ resource.name }}</h6>
                                     <span class="badge bg-light text-success">
-                                        <i class="fas fa-check"></i> Endorsed
+                                        <i class="fas fa-check"></i> Approved
                                     </span>
                                 </div>
                                 <div class="card-body">
@@ -60,10 +99,10 @@
                                     <small class="text-muted">
                                         <strong>Contributor:</strong> {{ resource.annotation_contributor.name }}<br>
                                         <strong>Submitted:</strong> {{ resource.annotation_date[:10] }}
-                                        {% if resource.endorsement_contributor %}
-                                        <br><strong>Endorsed by:</strong> {{ resource.endorsement_contributor.name }}
-                                        {% if resource.endorsement_date %}
-                                        <br><strong>Endorsed on:</strong> {{ resource.endorsement_date[:10] }}
+                                        {% if resource.approval_contributor %}
+                                        <br><strong>Approved by:</strong> {{ resource.approval_contributor.name }}
+                                        {% if resource.approval_date %}
+                                        <br><strong>Approved on:</strong> {{ resource.approval_date[:10] }}
                                         {% endif %}
                                         {% endif %}
                                     </small>
@@ -75,7 +114,7 @@
                 {% else %}
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
-                        No endorsed resources yet for this DANDI set.
+                        No approved resources yet for this DANDI set.
                     </div>
                 {% endif %}
             </div>
@@ -85,14 +124,52 @@
                 <h3 class="mb-3">
                     <i class="fas fa-clock text-warning"></i> 
                     Community Submissions
-                    <span class="badge bg-warning text-dark">{{ community_submissions|length }}</span>
+                    <span class="badge bg-warning text-dark">{{ community_pagination.total_items }}</span>
                 </h3>
                 
                 {% if community_submissions %}
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Note:</strong> These resources are pending review and have not yet been endorsed by moderators.
+                        <strong>Note:</strong> These resources are pending review and have not yet been approved by moderators.
                     </div>
+                    
+                    <!-- Community Submissions Pagination (top) -->
+                    {% if community_pagination.total_pages > 1 %}
+                    <div class="mb-3">
+                        <nav aria-label="Community submissions pagination">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-muted small">
+                                    Showing {{ community_pagination.start_item }}-{{ community_pagination.end_item }} of {{ community_pagination.total_items }} community submissions
+                                </div>
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item {% if not community_pagination.has_prev %}disabled{% endif %}">
+                                        {% if community_pagination.has_prev %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.prev_page, approved_page=request.args.get('approved_page', 1)) }}">‹</a>
+                                        {% else %}
+                                            <span class="page-link">‹</span>
+                                        {% endif %}
+                                    </li>
+                                    {% for page_num in range(1, community_pagination.total_pages + 1) %}
+                                        <li class="page-item {% if page_num == community_pagination.page %}active{% endif %}">
+                                            {% if page_num == community_pagination.page %}
+                                                <span class="page-link">{{ page_num }}</span>
+                                            {% else %}
+                                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=page_num, approved_page=request.args.get('approved_page', 1)) }}">{{ page_num }}</a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                    <li class="page-item {% if not community_pagination.has_next %}disabled{% endif %}">
+                                        {% if community_pagination.has_next %}
+                                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.next_page, approved_page=request.args.get('approved_page', 1)) }}">›</a>
+                                        {% else %}
+                                            <span class="page-link">›</span>
+                                        {% endif %}
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
+                    </div>
+                    {% endif %}
                     
                     <div class="row">
                         {% for resource in community_submissions %}
@@ -132,9 +209,9 @@
                                     {% if is_authenticated %}
                                     <!-- Moderator Actions -->
                                     <div class="mt-3 d-grid">
-                                        <a href="{{ url_for('endorse_submission', dandiset_id=dandiset_id, filename=resource._submission_filename) }}" 
+                                        <a href="{{ url_for('approve_submission', dandiset_id=dandiset_id, filename=resource._submission_filename) }}" 
                                            class="btn btn-success btn-sm">
-                                            <i class="fas fa-check"></i> Endorse Submission
+                                            <i class="fas fa-check"></i> Approve Submission
                                         </a>
                                     </div>
                                     {% endif %}
@@ -156,15 +233,15 @@
                 <div class="col-md-6">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h4 class="text-success">{{ endorsed_submissions|length }}</h4>
-                            <p class="mb-0">Endorsed Resources</p>
+                            <h4 class="text-success">{{ approved_pagination.total_items }}</h4>
+                            <p class="mb-0">Approved Resources</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h4 class="text-warning">{{ community_submissions|length }}</h4>
+                            <h4 class="text-warning">{{ community_pagination.total_items }}</h4>
                             <p class="mb-0">Pending Review</p>
                         </div>
                     </div>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'pagination.html' import render_pagination %}
 
 {% block content %}
 <div class="container-fluid">
@@ -11,7 +12,7 @@
                         <i class="fas fa-database"></i> DANDI External Resources
                     </h1>
                     <p class="lead">Community-driven external resources for DANDI datasets</p>
-                    <p class="mb-4">Discover and contribute external resources that complement DANDI datasets. Community submissions are reviewed and endorsed by moderators.</p>
+                    <p class="mb-4">Discover and contribute external resources that complement DANDI datasets. Community submissions are reviewed and approved by moderators.</p>
                     <div class="d-flex justify-content-center gap-3">
                         <a href="{{ url_for('submit_form') }}" class="btn btn-light btn-lg">
                             <i class="fas fa-plus"></i> Submit New Resource
@@ -31,8 +32,8 @@
                     <div class="card bg-success text-white text-center">
                         <div class="card-body">
                             <i class="fas fa-check-circle fa-2x mb-2"></i>
-                            <h3>{{ total_endorsed }}</h3>
-                            <p class="mb-0">Endorsed Resources</p>
+                            <h3>{{ total_approved }}</h3>
+                            <p class="mb-0">Approved Resources</p>
                         </div>
                     </div>
                 </div>
@@ -58,7 +59,7 @@
                     <div class="card bg-secondary text-white text-center">
                         <div class="card-body">
                             <i class="fas fa-link fa-2x mb-2"></i>
-                            <h3>{{ total_endorsed + total_community }}</h3>
+                            <h3>{{ total_approved + total_community }}</h3>
                             <p class="mb-0">Total Resources</p>
                         </div>
                     </div>
@@ -89,6 +90,9 @@
                         </div>
                     </div>
 
+                    <!-- Pagination (top) -->
+                    {{ render_pagination(pagination, 'index') }}
+
                     <!-- DANDISets List -->
                     <div class="card">
                         <div class="card-header bg-light">
@@ -97,7 +101,7 @@
                                     <strong>DANDI Set</strong>
                                 </div>
                                 <div class="col-md-2 text-center">
-                                    <strong>Endorsed</strong>
+                                    <strong>Approved</strong>
                                 </div>
                                 <div class="col-md-2 text-center">
                                     <strong>Pending</strong>
@@ -126,7 +130,7 @@
                                         </div>
                                         <div class="col-md-2 text-center">
                                             <span class="badge bg-success fs-6">
-                                                <i class="fas fa-check-circle"></i> {{ dandiset.endorsed_count }}
+                                                <i class="fas fa-check-circle"></i> {{ dandiset.approved_count }}
                                             </span>
                                         </div>
                                         <div class="col-md-2 text-center">
@@ -151,6 +155,9 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Pagination (bottom) -->
+                    {{ render_pagination(pagination, 'index') }}
 
                     <!-- No Results Message (hidden by default) -->
                     <div id="noResults" class="alert alert-info mt-3" style="display: none;">
