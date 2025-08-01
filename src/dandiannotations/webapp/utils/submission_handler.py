@@ -181,7 +181,7 @@ class SubmissionHandler:
                 'url': endorser_info.get('url'),
                 'schemaKey': 'AnnotationContributor'
             }
-            submission_data['endorsement_date'] = datetime.now().isoformat()
+            submission_data['endorsement_date'] = datetime.now().astimezone().isoformat()
             
             # Save the updated data to the endorsed folder
             with open(dest_path, 'w', encoding='utf-8') as file:

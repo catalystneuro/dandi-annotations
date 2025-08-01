@@ -182,7 +182,7 @@ def submit_resource():
         resource_data = {
             'dandiset_id': form_data['dandiset_id'],
             'annotation_contributor': contributor_data,
-            'annotation_date': datetime.now().isoformat(),
+            'annotation_date': datetime.now().astimezone().isoformat(),
             'name': form_data['resource_name'],
             'url': form_data['resource_url'],
             'repository': form_data['repository'],
