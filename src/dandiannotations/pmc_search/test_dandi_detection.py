@@ -4,7 +4,7 @@ Simple test script to check DANDI set detection in articles.
 Run this script to see which articles need manual review for DANDI set association.
 """
 
-from ncbi_api import search_dandi_articles, extract_dandisets_from_articles
+from ncbi_api import search_dandi_articles, extract_dandisets_from_articles, has_full_text
 
 
 def find_dandi_context_windows(text, window_size=50):
@@ -88,29 +88,14 @@ def test_article_dandi_detection():
 
             full_text = article.get('full_text', '')
             contexts = find_dandi_context_windows(full_text)
-            
-            # Also check tables for DANDI mentions
-            table_contexts = []
-            for table in article.get('tables', []):
-                for row in table.get('rows', []):
-                    for cell in row:
-                        if cell:
-                            cell_contexts = find_dandi_context_windows(cell)
-                            for ctx in cell_contexts:
-                                ctx['source'] = 'table'
-                            table_contexts.extend(cell_contexts)
                 
             # Show full text contexts
             for i, ctx in enumerate(contexts):
                 print(f"  {i+1}. \"{ctx['context']}\"")
-            
-            # Show table contexts
-            for i, ctx in enumerate(table_contexts):
-                print(f"  {i+1}. [TABLE] \"{ctx['context']}\"")
-            
-            if not contexts and not table_contexts:
-                print("  No DANDI mentions found in full text.")
-                print(f"{full_text = }")
+
+            if not contexts:
+                assert not has_full_text(article), f"Article {doi} has no DANDI mentions but has full text (> 10,000 characters)."
+                print(f"Article {doi} has no DANDI mentions and no full text available.")
 
 
 if __name__ == "__main__":

@@ -382,6 +382,28 @@ def extract_dandisets_from_articles(articles):
         article["dandisets"] = sorted(dandisets)
     return articles
 
+def has_full_text(article: dict) -> bool:
+    """
+    Check if the article has full text available.
+
+    Some articles appear to have the full text but it's actually just the abstract and some metadata.
+    To distinguish between the two, we use a character cutoff of 10,000. 
+
+    Parameters
+    ----------
+    article : dict
+        Article dictionary containing 'full_text' key.
+
+    Returns
+    -------
+    bool
+        True if full text is available, False otherwise.
+    """
+    full_text = article.get('full_text')
+    if full_text is None or len(full_text) < 10000:
+        return False
+    return True
+
 # Example execution
 if __name__ == "__main__":
     # Search for DANDI-related articles
@@ -400,3 +422,4 @@ if __name__ == "__main__":
             print(f"DOI: {article['doi']}")
         if 'dandisets' in article:
             print(f"DANDI Sets: {', '.join(article['dandisets'])}")
+        print(f"Has Full Text: {has_full_text(article)}")
