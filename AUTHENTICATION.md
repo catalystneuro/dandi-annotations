@@ -2,13 +2,13 @@
 
 ## Overview
 
-The DANDI External Resources webapp now includes a unified interface with authentication to control endorsement permissions. This allows moderators to log in and endorse community submissions directly from the main interface.
+The DANDI External Resources webapp now includes a unified interface with authentication to control approval permissions. This allows moderators to log in and approve community submissions directly from the main interface.
 
 ## Authentication Features
 
 ### User Types
 - **Anonymous Users**: Can view all resources and submit new resources
-- **Authenticated Moderators**: Can view, submit, and endorse resources
+- **Authenticated Moderators**: Can view, submit, and approve resources
 
 ### Login System
 - Simple username/password authentication
@@ -73,35 +73,35 @@ print(password_hash)
 
 ### Conditional Features
 - **Moderate Button**: Only visible to authenticated moderators
-- **Endorse Buttons**: Only visible to authenticated moderators on community submissions
+- **Approve Buttons**: Only visible to authenticated moderators on community submissions
 - **Moderation Page**: Protected by authentication
 
 ### Visual Indicators
 - **Moderator Status**: Clear indication when logged in as a moderator
-- **Endorsement Actions**: Prominent "Endorse Submission" buttons on community resources
+- **Approval Actions**: Prominent "Approve Submission" buttons on community resources
 - **Authentication State**: Login/logout options based on current state
 
 ## Security Features
 
 - **Password Hashing**: All passwords stored as bcrypt hashes
 - **Session Management**: Secure session handling with Flask-Session
-- **Route Protection**: Endorsement actions require authentication
+- **Route Protection**: Approval actions require authentication
 - **CSRF Protection**: Built into Flask's session management
 
 ## Usage Workflow
 
 ### For Regular Users
 1. Visit the homepage
-2. Browse endorsed and community resources
+2. Browse approved and community resources
 3. Submit new resources (no login required)
 
 ### For Moderators
 1. Click "Login" in the navigation
 2. Enter username and password
-3. Browse resources with endorsement capabilities
-4. Click "Endorse Submission" on community resources
-5. Fill out endorsement form (pre-populated with moderator info)
-6. Submit endorsement to move resource to endorsed folder
+3. Browse resources with approval capabilities
+4. Click "Approve Submission" on community resources
+5. Fill out approval form (pre-populated with moderator info)
+6. Submit approval to move resource to approved folder
 
 ## File Structure
 

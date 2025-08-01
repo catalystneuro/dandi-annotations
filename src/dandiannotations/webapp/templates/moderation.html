@@ -8,7 +8,7 @@
             <!-- Header -->
             <div class="mb-4">
                 <h2><i class="fas fa-gavel"></i> Moderation Interface</h2>
-                <p class="text-muted">Review and endorse community submissions</p>
+                <p class="text-muted">Review and approve community submissions</p>
             </div>
 
 
@@ -97,9 +97,9 @@
                                     
                                     <!-- Action Buttons -->
                                     <div class="mt-3 d-grid gap-2">
-                                        <a href="{{ url_for('endorse_submission', dandiset_id=resource._dandiset_id, filename=resource._submission_filename) }}" 
+                                        <a href="{{ url_for('approve_submission', dandiset_id=resource._dandiset_id, filename=resource._submission_filename) }}" 
                                            class="btn btn-success w-100">
-                                            <i class="fas fa-check"></i> Endorse Submission
+                                            <i class="fas fa-check"></i> Approve Submission
                                         </a>
                                         <a href="{{ url_for('dandiset_resources', dandiset_id=resource._dandiset_id) }}" 
                                            class="btn btn-outline-primary btn-sm">

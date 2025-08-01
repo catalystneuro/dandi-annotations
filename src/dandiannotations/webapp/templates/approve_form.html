@@ -7,7 +7,7 @@
             <div class="card border-warning">
                 <div class="card-header bg-warning text-dark">
                     <h5 class="mb-0">
-                        <i class="fas fa-gavel"></i> Endorse Submission
+                        <i class="fas fa-gavel"></i> Approve Submission
                     </h5>
                 </div>
                 <div class="card-body">
@@ -24,8 +24,8 @@
                         <p class="mb-0"><strong>Submitted on:</strong> {{ submission.annotation_date[:10] }}</p>
                     </div>
 
-                    <!-- Endorsement Form -->
-                    <form method="POST" action="{{ url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename) }}">
+                    <!-- Approval Form -->
+                    <form method="POST" action="{{ url_for('approve_submission', dandiset_id=dandiset_id, filename=filename) }}">
                         <h6 class="mb-3"><i class="fas fa-user-check"></i> Moderator Information</h6>
                         
                         <div class="row">
@@ -84,7 +84,7 @@
 
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <strong>Important:</strong> By endorsing this submission, you are confirming that:
+                            <strong>Important:</strong> By approving this submission, you are confirming that:
                             <ul class="mb-0 mt-2">
                                 <li>The external resource is relevant and valuable to the DANDI community</li>
                                 <li>The resource information appears accurate and complete</li>
@@ -96,8 +96,8 @@
                             <a href="{{ url_for('moderate') }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> Back to Moderation
                             </a>
-                            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to endorse this submission?');">
-                                <i class="fas fa-check"></i> Endorse Submission
+                            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to approve this submission?');">
+                                <i class="fas fa-check"></i> Approve Submission
                             </button>
                         </div>
                     </form>

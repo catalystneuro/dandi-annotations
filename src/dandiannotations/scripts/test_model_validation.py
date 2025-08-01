@@ -262,15 +262,15 @@ class TestIntegrationScenarios:
         assert resource.annotation_contributor.name == "Dr. Jane Smith"
         assert str(resource.annotation_contributor.identifier) == "https://orcid.org/0000-0002-1825-0097"
 
-    def test_resource_with_endorsement(self):
-        """Test resource creation with endorsement contributor"""
+    def test_resource_with_approval(self):
+        """Test resource creation with approval contributor"""
         contributor = AnnotationContributor(
             name="Dr. Jane Smith",
             email="jane.smith@university.edu",
             identifier="https://orcid.org/0000-0002-1825-0097"
         )
         
-        endorser = AnnotationContributor(
+        approver = AnnotationContributor(
             name="Dr. Bob Wilson",
             email="bob.wilson@institute.org"
         )
@@ -283,13 +283,13 @@ class TestIntegrationScenarios:
             relation="dcite:IsReferencedBy",
             annotation_contributor=contributor,
             annotation_date=datetime.now(),
-            endorsement_contributor=endorser,
-            endorsement_date=datetime.now()
+            approval_contributor=approver,
+            approval_date=datetime.now()
         )
         
-        assert resource.endorsement_contributor is not None
-        assert resource.endorsement_contributor.name == "Dr. Bob Wilson"
-        assert resource.endorsement_date is not None
+        assert resource.approval_contributor is not None
+        assert resource.approval_contributor.name == "Dr. Bob Wilson"
+        assert resource.approval_date is not None
 
     def test_minimal_valid_data(self):
         """Test creation with minimal required data"""
@@ -310,8 +310,8 @@ class TestIntegrationScenarios:
         
         assert resource.annotation_contributor.identifier is None
         assert resource.annotation_contributor.url is None
-        assert resource.endorsement_contributor is None
-        assert resource.endorsement_date is None
+        assert resource.approval_contributor is None
+        assert resource.approval_date is None
 
 
 # Pytest configuration and helper functions

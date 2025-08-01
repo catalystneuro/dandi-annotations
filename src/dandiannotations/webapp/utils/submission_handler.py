@@ -39,12 +39,12 @@ class SubmissionHandler:
         community_dir.mkdir(parents=True, exist_ok=True)
         return community_dir
     
-    def _get_endorsed_dir(self, dandiset_id: str) -> Path:
-        """Get the endorsed submissions directory for a dandiset"""
+    def _get_approved_dir(self, dandiset_id: str) -> Path:
+        """Get the approved submissions directory for a dandiset"""
         dandiset_dir = self._get_dandiset_dir(dandiset_id)
-        endorsed_dir = dandiset_dir / "endorsed"
-        endorsed_dir.mkdir(parents=True, exist_ok=True)
-        return endorsed_dir
+        approved_dir = dandiset_dir / "approved"
+        approved_dir.mkdir(parents=True, exist_ok=True)
+        return approved_dir
     
     def _generate_submission_filename(self) -> str:
         """Generate a timestamped filename for a new submission"""
@@ -111,28 +111,28 @@ class SubmissionHandler:
         except Exception as e:
             raise Exception(f"Error loading community submissions: {str(e)}")
     
-    def get_endorsed_submissions(self, dandiset_id: str) -> List[Dict[str, Any]]:
+    def get_approved_submissions(self, dandiset_id: str) -> List[Dict[str, Any]]:
         """
-        Get all endorsed submissions for a dandiset
+        Get all approved submissions for a dandiset
         
         Args:
             dandiset_id: The dandiset identifier
             
         Returns:
-            List of endorsed submission data with metadata
+            List of approved submission data with metadata
         """
         try:
-            endorsed_dir = self._get_endorsed_dir(dandiset_id)
+            approved_dir = self._get_approved_dir(dandiset_id)
             submissions = []
             
-            for yaml_file in endorsed_dir.glob("*.yaml"):
+            for yaml_file in approved_dir.glob("*.yaml"):
                 try:
                     with open(yaml_file, 'r', encoding='utf-8') as file:
                         data = yaml.safe_load(file)
                         if data:
                             # Add metadata about the submission
                             data['_submission_filename'] = yaml_file.name
-                            data['_submission_status'] = 'endorsed'
+                            data['_submission_status'] = 'approved'
                             submissions.append(data)
                 except Exception as e:
                     print(f"Error loading {yaml_file}: {e}")
@@ -142,48 +142,48 @@ class SubmissionHandler:
             submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
             return submissions
         except Exception as e:
-            raise Exception(f"Error loading endorsed submissions: {str(e)}")
+            raise Exception(f"Error loading approved submissions: {str(e)}")
     
-    def endorse_submission(self, dandiset_id: str, filename: str, endorser_info: Dict[str, Any]) -> bool:
+    def approve_submission(self, dandiset_id: str, filename: str, approver_info: Dict[str, Any]) -> bool:
         """
-        Move a submission from community to endorsed folder and add endorsement information
+        Move a submission from community to approved folder and add approval information
         
         Args:
             dandiset_id: The dandiset identifier
-            filename: The filename of the submission to endorse
-            endorser_info: Information about the person endorsing (name, email, etc.)
+            filename: The filename of the submission to approve
+            approver_info: Information about the person approving (name, email, etc.)
             
         Returns:
             True if successful, False otherwise
         """
         try:
             community_dir = self._get_community_dir(dandiset_id)
-            endorsed_dir = self._get_endorsed_dir(dandiset_id)
+            approved_dir = self._get_approved_dir(dandiset_id)
             
             source_path = community_dir / filename
-            dest_path = endorsed_dir / filename
+            dest_path = approved_dir / filename
             
             if not source_path.exists():
                 raise FileNotFoundError(f"Submission file not found: {filename}")
             
             if dest_path.exists():
-                raise FileExistsError(f"File already exists in endorsed folder: {filename}")
+                raise FileExistsError(f"File already exists in approved folder: {filename}")
             
             # Load the existing submission data
             with open(source_path, 'r', encoding='utf-8') as file:
                 submission_data = yaml.safe_load(file)
             
-            # Add endorsement information
-            submission_data['endorsement_contributor'] = {
-                'name': endorser_info.get('name', 'Unknown Moderator'),
-                'email': endorser_info.get('email'),
-                'identifier': endorser_info.get('identifier'),
-                'url': endorser_info.get('url'),
+            # Add approval information
+            submission_data['approval_contributor'] = {
+                'name': approver_info.get('name', 'Unknown Moderator'),
+                'email': approver_info.get('email'),
+                'identifier': approver_info.get('identifier'),
+                'url': approver_info.get('url'),
                 'schemaKey': 'AnnotationContributor'
             }
-            submission_data['endorsement_date'] = datetime.now().astimezone().isoformat()
+            submission_data['approval_date'] = datetime.now().astimezone().isoformat()
             
-            # Save the updated data to the endorsed folder
+            # Save the updated data to the approved folder
             with open(dest_path, 'w', encoding='utf-8') as file:
                 yaml.dump(submission_data, file, default_flow_style=False, 
                          allow_unicode=True, sort_keys=False, indent=2)
@@ -194,7 +194,7 @@ class SubmissionHandler:
             return True
             
         except Exception as e:
-            raise Exception(f"Error endorsing submission: {str(e)}")
+            raise Exception(f"Error approving submission: {str(e)}")
     
     def get_all_pending_submissions(self) -> List[Dict[str, Any]]:
         """
@@ -231,7 +231,7 @@ class SubmissionHandler:
         Args:
             dandiset_id: The dandiset identifier
             filename: The submission filename
-            status: 'community' or 'endorsed'
+            status: 'community' or 'approved'
             
         Returns:
             The submission data or None if not found
@@ -240,7 +240,7 @@ class SubmissionHandler:
             if status == 'community':
                 target_dir = self._get_community_dir(dandiset_id)
             else:
-                target_dir = self._get_endorsed_dir(dandiset_id)
+                target_dir = self._get_approved_dir(dandiset_id)
             
             filepath = target_dir / filename
             
@@ -261,7 +261,7 @@ class SubmissionHandler:
     
     def get_all_dandisets(self) -> List[Dict[str, Any]]:
         """
-        Get all dandisets that have submissions (community or endorsed)
+        Get all dandisets that have submissions (community or approved)
         
         Returns:
             List of dandiset info with submission counts
@@ -276,8 +276,8 @@ class SubmissionHandler:
                     
                     # Count submissions
                     community_count = len(self.get_community_submissions(dandiset_id))
-                    endorsed_count = len(self.get_endorsed_submissions(dandiset_id))
-                    total_count = community_count + endorsed_count
+                    approved_count = len(self.get_approved_submissions(dandiset_id))
+                    total_count = community_count + approved_count
                     
                     # Only include dandisets that have submissions
                     if total_count > 0:
@@ -288,7 +288,7 @@ class SubmissionHandler:
                             'id': dandiset_id,
                             'display_id': display_id,
                             'community_count': community_count,
-                            'endorsed_count': endorsed_count,
+                            'approved_count': approved_count,
                             'total_count': total_count
                         })
             
@@ -369,9 +369,9 @@ class SubmissionHandler:
         all_submissions = self.get_community_submissions(dandiset_id)
         return self._paginate_list(all_submissions, page, per_page)
     
-    def get_endorsed_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    def get_approved_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Get paginated endorsed submissions for a dandiset
+        Get paginated approved submissions for a dandiset
         
         Args:
             dandiset_id: The dandiset identifier
@@ -381,7 +381,7 @@ class SubmissionHandler:
         Returns:
             Tuple of (paginated_submissions, pagination_info)
         """
-        all_submissions = self.get_endorsed_submissions(dandiset_id)
+        all_submissions = self.get_approved_submissions(dandiset_id)
         return self._paginate_list(all_submissions, page, per_page)
     
     def get_all_pending_submissions_paginated(self, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:

@@ -91,14 +91,14 @@ def index():
         
         # Calculate total statistics
         total_community = sum(ds['community_count'] for ds in all_dandisets)
-        total_endorsed = sum(ds['endorsed_count'] for ds in all_dandisets)
+        total_approved = sum(ds['approved_count'] for ds in all_dandisets)
         total_dandisets = len(all_dandisets)
         
         return render_template('homepage.html',
                              all_dandisets=paginated_dandisets,
                              pagination=pagination_info,
                              total_community=total_community,
-                             total_endorsed=total_endorsed,
+                             total_approved=total_approved,
                              total_dandisets=total_dandisets)
     except Exception as e:
         flash(f'Error loading homepage: {str(e)}', 'error')
@@ -106,7 +106,7 @@ def index():
                              all_dandisets=[],
                              pagination={'page': 1, 'total_pages': 1, 'has_prev': False, 'has_next': False},
                              total_community=0,
-                             total_endorsed=0,
+                             total_approved=0,
                              total_dandisets=0)
 
 @app.route('/submit')
@@ -224,15 +224,15 @@ def dandiset_resources(dandiset_id):
     """Display resources for a specific dandiset"""
     try:
         # Get pagination parameters
-        endorsed_page = request.args.get('endorsed_page', 1, type=int)
+        approved_page = request.args.get('approved_page', 1, type=int)
         community_page = request.args.get('community_page', 1, type=int)
         per_page = 9  # 9 resources per page for 3x3 grid
         
         # Get paginated submissions
         community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
             dandiset_id, community_page, per_page)
-        endorsed_submissions, endorsed_pagination = submission_handler.get_endorsed_submissions_paginated(
-            dandiset_id, endorsed_page, per_page)
+        approved_submissions, approved_pagination = submission_handler.get_approved_submissions_paginated(
+            dandiset_id, approved_page, per_page)
         
         # Get all dandisets for navigation
         all_dandisets = submission_handler.get_all_dandisets()
@@ -244,9 +244,9 @@ def dandiset_resources(dandiset_id):
                              dandiset_id=dandiset_id,
                              display_id=display_id,
                              community_submissions=community_submissions,
-                             endorsed_submissions=endorsed_submissions,
+                             approved_submissions=approved_submissions,
                              community_pagination=community_pagination,
-                             endorsed_pagination=endorsed_pagination,
+                             approved_pagination=approved_pagination,
                              all_dandisets=all_dandisets)
     except Exception as e:
         flash(f'Error loading resources: {str(e)}', 'error')
@@ -274,19 +274,19 @@ def moderate():
         flash(f'Error loading pending submissions: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/endorse/<dandiset_id>/<filename>', methods=['GET', 'POST'])
+@app.route('/approve/<dandiset_id>/<filename>', methods=['GET', 'POST'])
 @login_required
-def endorse_submission(dandiset_id, filename):
-    """Endorse a community submission"""
+def approve_submission(dandiset_id, filename):
+    """Approve a community submission"""
     if request.method == 'GET':
-        # Show endorsement form
+        # Show approval form
         try:
             submission = submission_handler.get_submission_by_filename(dandiset_id, filename, 'community')
             if not submission:
                 flash('Submission not found', 'error')
                 return redirect(url_for('moderate'))
             
-            return render_template('endorse_form.html',
+            return render_template('approve_form.html',
                                  submission=submission,
                                  dandiset_id=dandiset_id,
                                  filename=filename)
@@ -295,7 +295,7 @@ def endorse_submission(dandiset_id, filename):
             return redirect(url_for('moderate'))
     
     elif request.method == 'POST':
-        # Process endorsement
+        # Process approval
         try:
             # Get moderator information from form
             moderator_info = {
@@ -308,26 +308,26 @@ def endorse_submission(dandiset_id, filename):
             # Validate required moderator fields
             if not moderator_info['name']:
                 flash('Moderator name is required', 'error')
-                return redirect(url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename))
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
             
             if not moderator_info['email']:
                 flash('Moderator email is required', 'error')
-                return redirect(url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename))
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
             
             # Validate email format
             if not validate_email(moderator_info['email']):
                 flash('Invalid moderator email format', 'error')
-                return redirect(url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename))
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
             
             # Validate ORCID if provided
             if moderator_info['identifier'] and not validate_orcid(moderator_info['identifier']):
                 flash('Invalid ORCID format', 'error')
-                return redirect(url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename))
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
             
             # Validate URL if provided
             if moderator_info['url'] and not validate_url(moderator_info['url']):
                 flash('Invalid moderator URL format', 'error')
-                return redirect(url_for('endorse_submission', dandiset_id=dandiset_id, filename=filename))
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
             
             # Remove empty fields
             moderator_info = {k: v for k, v in moderator_info.items() if v}
@@ -335,18 +335,18 @@ def endorse_submission(dandiset_id, filename):
             # Get submission details for better success message
             submission = submission_handler.get_submission_by_filename(dandiset_id, filename, 'community')
             
-            success = submission_handler.endorse_submission(dandiset_id, filename, moderator_info)
+            success = submission_handler.approve_submission(dandiset_id, filename, moderator_info)
             if success:
                 if submission:
                     resource_name = submission.get('name', 'Unknown Resource')
                     display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-                    flash(f'Successfully endorsed "{resource_name}" for {display_id}', 'success')
+                    flash(f'Successfully approved "{resource_name}" for {display_id}', 'success')
                 else:
-                    flash(f'Successfully endorsed submission: {filename}', 'success')
+                    flash(f'Successfully approved submission: {filename}', 'success')
             else:
-                flash(f'Failed to endorse submission: {filename}', 'error')
+                flash(f'Failed to approve submission: {filename}', 'error')
         except Exception as e:
-            flash(f'Error endorsing submission: {str(e)}', 'error')
+            flash(f'Error approving submission: {str(e)}', 'error')
         
         # Redirect back to moderation page
         return redirect(url_for('moderate'))

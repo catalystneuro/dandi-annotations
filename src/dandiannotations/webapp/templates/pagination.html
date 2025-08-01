@@ -77,8 +77,8 @@
     {% endif %}
 {% endmacro %}
 
-{# Specialized pagination for dandiset resources with separate community and endorsed pagination #}
-{% macro render_dual_pagination(community_pagination, endorsed_pagination, dandiset_id) %}
+{# Specialized pagination for dandiset resources with separate community and approved pagination #}
+{% macro render_dual_pagination(community_pagination, approved_pagination, dandiset_id) %}
     <div class="row">
         {% if community_pagination.total_pages > 1 %}
         <div class="col-md-6">
@@ -91,7 +91,7 @@
                     {# Previous button #}
                     <li class="page-item {% if not community_pagination.has_prev %}disabled{% endif %}">
                         {% if community_pagination.has_prev %}
-                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.prev_page, endorsed_page=request.args.get('endorsed_page', 1)) }}" aria-label="Previous">
+                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.prev_page, approved_page=request.args.get('approved_page', 1)) }}" aria-label="Previous">
                                 <span aria-hidden="true">&laquo;</span>
                             </a>
                         {% else %}
@@ -107,7 +107,7 @@
                             {% if page_num == community_pagination.page %}
                                 <span class="page-link">{{ page_num }}</span>
                             {% else %}
-                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=page_num, endorsed_page=request.args.get('endorsed_page', 1)) }}">{{ page_num }}</a>
+                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=page_num, approved_page=request.args.get('approved_page', 1)) }}">{{ page_num }}</a>
                             {% endif %}
                         </li>
                     {% endfor %}
@@ -115,7 +115,7 @@
                     {# Next button #}
                     <li class="page-item {% if not community_pagination.has_next %}disabled{% endif %}">
                         {% if community_pagination.has_next %}
-                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.next_page, endorsed_page=request.args.get('endorsed_page', 1)) }}" aria-label="Next">
+                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, community_page=community_pagination.next_page, approved_page=request.args.get('approved_page', 1)) }}" aria-label="Next">
                                 <span aria-hidden="true">&raquo;</span>
                             </a>
                         {% else %}
@@ -129,18 +129,18 @@
         </div>
         {% endif %}
 
-        {% if endorsed_pagination.total_pages > 1 %}
+        {% if approved_pagination.total_pages > 1 %}
         <div class="col-md-6">
-            <h6>Endorsed Resources Pagination</h6>
-            <nav aria-label="Endorsed resources pagination">
+            <h6>Approved Resources Pagination</h6>
+            <nav aria-label="Approved resources pagination">
                 <div class="text-muted small mb-2">
-                    Showing {{ endorsed_pagination.start_item }}-{{ endorsed_pagination.end_item }} of {{ endorsed_pagination.total_items }} endorsed resources
+                    Showing {{ approved_pagination.start_item }}-{{ approved_pagination.end_item }} of {{ approved_pagination.total_items }} approved resources
                 </div>
                 <ul class="pagination pagination-sm">
                     {# Previous button #}
-                    <li class="page-item {% if not endorsed_pagination.has_prev %}disabled{% endif %}">
-                        {% if endorsed_pagination.has_prev %}
-                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, endorsed_page=endorsed_pagination.prev_page, community_page=request.args.get('community_page', 1)) }}" aria-label="Previous">
+                    <li class="page-item {% if not approved_pagination.has_prev %}disabled{% endif %}">
+                        {% if approved_pagination.has_prev %}
+                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, approved_page=approved_pagination.prev_page, community_page=request.args.get('community_page', 1)) }}" aria-label="Previous">
                                 <span aria-hidden="true">&laquo;</span>
                             </a>
                         {% else %}
@@ -151,20 +151,20 @@
                     </li>
 
                     {# Page numbers #}
-                    {% for page_num in range(1, endorsed_pagination.total_pages + 1) %}
-                        <li class="page-item {% if page_num == endorsed_pagination.page %}active{% endif %}">
-                            {% if page_num == endorsed_pagination.page %}
+                    {% for page_num in range(1, approved_pagination.total_pages + 1) %}
+                        <li class="page-item {% if page_num == approved_pagination.page %}active{% endif %}">
+                            {% if page_num == approved_pagination.page %}
                                 <span class="page-link">{{ page_num }}</span>
                             {% else %}
-                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, endorsed_page=page_num, community_page=request.args.get('community_page', 1)) }}">{{ page_num }}</a>
+                                <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, approved_page=page_num, community_page=request.args.get('community_page', 1)) }}">{{ page_num }}</a>
                             {% endif %}
                         </li>
                     {% endfor %}
 
                     {# Next button #}
-                    <li class="page-item {% if not endorsed_pagination.has_next %}disabled{% endif %}">
-                        {% if endorsed_pagination.has_next %}
-                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, endorsed_page=endorsed_pagination.next_page, community_page=request.args.get('community_page', 1)) }}" aria-label="Next">
+                    <li class="page-item {% if not approved_pagination.has_next %}disabled{% endif %}">
+                        {% if approved_pagination.has_next %}
+                            <a class="page-link" href="{{ url_for('dandiset_resources', dandiset_id=dandiset_id, approved_page=approved_pagination.next_page, community_page=request.args.get('community_page', 1)) }}" aria-label="Next">
                                 <span aria-hidden="true">&raquo;</span>
                             </a>
                         {% else %}

@@ -69,15 +69,15 @@ class ExternalResource(Resource):
         title="Annotation Date", 
         description="When this resource annotation was created"
     )
-    endorsement_contributor: Optional[AnnotationContributor] = Field(
+    approval_contributor: Optional[AnnotationContributor] = Field(
         default=None,
-        title="Endorsement Contributor",
-        description="Person or organization who endorsed this resource"
+        title="Approval Contributor",
+        description="Person or organization who approved this resource"
     )
-    endorsement_date: Optional[datetime] = Field(
+    approval_date: Optional[datetime] = Field(
         default=None,
-        title="Endorsement Date",
-        description="When this resource was endorsed by a moderator"
+        title="Approval Date",
+        description="When this resource was approved by a moderator"
     )
     
     schemaKey: Literal["ExternalResource"] = Field(
