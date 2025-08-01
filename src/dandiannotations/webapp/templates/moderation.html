@@ -17,7 +17,7 @@
                 <div class="col-md-4">
                     <div class="card bg-warning text-dark">
                         <div class="card-body text-center">
-                            <h3>{{ pending_submissions|length }}</h3>
+                            <h3>{{ pagination.total_items }}</h3>
                             <p class="mb-0">Pending Submissions</p>
                         </div>
                     </div>
@@ -25,7 +25,7 @@
                 <div class="col-md-4">
                     <div class="card bg-info text-white">
                         <div class="card-body text-center">
-                            <h3>{{ pending_submissions|map(attribute='_dandiset_id')|unique|list|length }}</h3>
+                            <h3>{{ total_unique_dandisets }}</h3>
                             <p class="mb-0">DANDI Sets with Submissions</p>
                         </div>
                     </div>
@@ -33,7 +33,7 @@
                 <div class="col-md-4">
                     <div class="card bg-secondary text-white">
                         <div class="card-body text-center">
-                            <h3>{{ pending_submissions|map(attribute='annotation_contributor.name')|unique|list|length }}</h3>
+                            <h3>{{ total_unique_contributors }}</h3>
                             <p class="mb-0">Unique Contributors</p>
                         </div>
                     </div>

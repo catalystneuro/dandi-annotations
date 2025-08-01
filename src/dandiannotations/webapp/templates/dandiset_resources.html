@@ -24,7 +24,7 @@
                 <h3 class="mb-3">
                     <i class="fas fa-check-circle text-success"></i> 
                     Approved Resources
-                    <span class="badge bg-success">{{ approved_submissions|length }}</span>
+                    <span class="badge bg-success">{{ approved_pagination.total_items }}</span>
                 </h3>
                 
                 {% if approved_submissions %}
@@ -124,7 +124,7 @@
                 <h3 class="mb-3">
                     <i class="fas fa-clock text-warning"></i> 
                     Community Submissions
-                    <span class="badge bg-warning text-dark">{{ community_submissions|length }}</span>
+                    <span class="badge bg-warning text-dark">{{ community_pagination.total_items }}</span>
                 </h3>
                 
                 {% if community_submissions %}
@@ -233,7 +233,7 @@
                 <div class="col-md-6">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h4 class="text-success">{{ approved_submissions|length }}</h4>
+                            <h4 class="text-success">{{ approved_pagination.total_items }}</h4>
                             <p class="mb-0">Approved Resources</p>
                         </div>
                     </div>
@@ -241,7 +241,7 @@
                 <div class="col-md-6">
                     <div class="card bg-light">
                         <div class="card-body text-center">
-                            <h4 class="text-warning">{{ community_submissions|length }}</h4>
+                            <h4 class="text-warning">{{ community_pagination.total_items }}</h4>
                             <p class="mb-0">Pending Review</p>
                         </div>
                     </div>

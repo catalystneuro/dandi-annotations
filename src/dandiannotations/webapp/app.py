@@ -263,13 +263,22 @@ def moderate():
         # Get paginated pending community submissions across all dandisets
         pending_submissions, pagination_info = submission_handler.get_all_pending_submissions_paginated(page, per_page)
         
+        # Get all pending submissions for calculating total unique counts
+        all_pending_submissions = submission_handler.get_all_pending_submissions()
+        
+        # Calculate total unique counts
+        total_unique_dandisets = len(set(submission.get('_dandiset_id') for submission in all_pending_submissions))
+        total_unique_contributors = len(set(submission.get('annotation_contributor', {}).get('name') for submission in all_pending_submissions if submission.get('annotation_contributor', {}).get('name')))
+        
         # Get all dandisets for navigation
         all_dandisets = submission_handler.get_all_dandisets()
         
         return render_template('moderation.html',
                              pending_submissions=pending_submissions,
                              pagination=pagination_info,
-                             all_dandisets=all_dandisets)
+                             all_dandisets=all_dandisets,
+                             total_unique_dandisets=total_unique_dandisets,
+                             total_unique_contributors=total_unique_contributors)
     except Exception as e:
         flash(f'Error loading pending submissions: {str(e)}', 'error')
         return redirect(url_for('index'))
