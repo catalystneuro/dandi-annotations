@@ -4,7 +4,7 @@ Simple test script to check DANDI set detection in articles.
 Run this script to see which articles need manual review for DANDI set association.
 """
 
-from ncbi_api import search_dandi_articles, extract_dandisets_from_articles, has_full_text
+from pmc_searcher import search_dandi_articles, extract_dandisets_from_articles, has_full_text
 
 
 def find_dandi_context_windows(text, window_size=50):

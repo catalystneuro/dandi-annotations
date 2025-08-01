@@ -6,33 +6,36 @@ import json
 from typing import Literal
 import re
 
-class NcbiAPI:
+class PMCSearcher:
     def __init__(self, email=None, api_key=None):
         self.base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
         self.email = email  # Required for courtesy
         self.api_key = api_key  # Optional, increases rate limits
 
-    def get_pmids(self, query: str, max_results: int = 100, database: Literal["pubmed", "pmc"] = "pubmed") -> list[str]:
+    def search(self, query: str, max_results: int = 100) -> list[str]:
+        pmids = self.get_pmids(query=query, max_results=max_results)
+        articles = self.get_article_details(pmids=pmids)
+        return articles
+
+    def get_pmids(self, query: str, max_results: int = 100) -> list[str]:
         """
         Search with NCBI E-Utilities for articles matching query
         
         Parameters
         ----------
         query : str
-            Search term to query NCBI databases
+            Search term to query NCBI PMC database
         max_results : int
             Maximum number of results to return (default 100)
-        database : str
-            Database to search in, either "pubmed" or "pmc" (default "pubmed")
         
         Returns
         -------
         list[str]
-            List of PMIDs or PMCIDs matching the search query
+            List of PMIDs matching the search query
         """
         url = f"{self.base_url}esearch.fcgi"
         params = {
-            'db': database,
+            'db': 'pmc',
             'term': query,
             'retmax': max_results,
             'retmode': 'json',
@@ -50,17 +53,15 @@ class NcbiAPI:
         data = response.json()
         return data['esearchresult']['idlist']
 
-    def get_article_details(self, pmids: list[str], database: Literal["pubmed", "pmc"] = "pubmed") -> list[dict]:
+    def get_article_details(self, pmids: list[str]) -> list[dict]:
         """
         Get detailed information for list of PMIDs.
 
         Parameters
         ----------
         pmids : list[str]
-            List of PMIDs or PMCIDs to retrieve details for
-        database : str
-            Database to fetch details from, either "pubmed" or "pmc" (default "pubmed")
-        
+            List of PMIDs to retrieve details for
+
         Returns
         -------
         list[dict]
@@ -71,7 +72,7 @@ class NcbiAPI:
             
         url = f"{self.base_url}efetch.fcgi"
         params = {
-            'db': database,
+            'db': 'pmc',
             'id': ','.join(pmids),
             'retmode': 'xml',
         }
@@ -83,51 +84,17 @@ class NcbiAPI:
             
         response = requests.get(url, params=params)
         response.raise_for_status()
-        
-        if database == "pubmed":
-            return self.parse_pubmed_xml(response.text)
-        elif database == "pmc":
-            return self.parse_pmc_xml(response.text)
-        else:
-            raise ValueError(f"Unsupported database: {database}")
-        
-    def parse_pubmed_xml(self, xml_text: str) -> list[dict]:
+
+        return self.parse_xml(response.text)
+    
+    def parse_xml(self, xml_text: str) -> list[dict]:
         """
-        Parse PubMed XML response into structured data.
+        Parse XML response into structured data.
 
         Parameters
         ----------
         xml_text : str
-            Raw XML text from PubMed response
-
-        Returns
-        -------
-        list[dict]
-            List of dictionaries containing article details
-        """
-        root = ET.fromstring(xml_text)
-        articles = []
-        
-        for article in root.findall('.//PubmedArticle'):
-            article_data = {
-                'pmid': self._extract_pubmed_pmid(article),
-                'title': self._extract_pubmed_title(article),
-                'doi': self._extract_pubmed_doi(article),
-            }
-            
-            articles.append(article_data)
-                
-        return articles
-    
-    
-    def parse_pmc_xml(self, xml_text: str) -> list[dict]:
-        """
-        Parse PMC XML response into structured data.
-
-        Parameters
-        ----------
-        xml_text : str
-            Raw XML text from PMC response
+            Raw XML text from response
 
         Returns
         -------
@@ -139,7 +106,6 @@ class NcbiAPI:
         
         for article in root.findall('.//article'):
             article_data = {
-                'pmc_id': self._extract_pmc_id(article),
                 'pmid': self._extract_pmid(article),
                 'title': self._extract_title(article),
                 'doi': self._extract_doi(article),
@@ -149,76 +115,6 @@ class NcbiAPI:
             articles.append(article_data)
                 
         return articles
-
-    def _extract_pubmed_pmid(self, article_elem: ET.Element) -> str:
-        """
-        Extract PMID from PubMed article element.
-        
-        Parameters
-        ----------
-        article_elem : ET.Element
-            The PubMed article XML element
-            
-        Returns
-        -------
-        str
-            PMID
-        """
-        pmid_elem = article_elem.find('.//PMID')
-        return pmid_elem.text if pmid_elem is not None else None
-    
-    def _extract_pubmed_title(self, article_elem: ET.Element) -> str:
-        """
-        Extract article title from PubMed article element.
-        
-        Parameters
-        ----------
-        article_elem : ET.Element
-            The PubMed article XML element
-            
-        Returns
-        -------
-        str
-            Article title or "No title" if not found
-        """
-        title_elem = article_elem.find('.//ArticleTitle')
-        return title_elem.text if title_elem is not None else "No title"
-    
-    def _extract_pubmed_doi(self, article_elem: ET.Element) -> str:
-        """
-        Extract DOI from PubMed article element.
-        
-        Parameters
-        ----------
-        article_elem : ET.Element
-            The PubMed article XML element
-            
-        Returns
-        -------
-        str
-            DOI or None if not found
-        """
-        doi_elem = article_elem.find('.//ArticleId[@IdType="doi"]')
-        return doi_elem.text if doi_elem is not None else None
-    
-    def _extract_pmc_id(self, article_elem: ET.Element) -> str:
-        """
-        Extract PMC ID from article element.
-        
-        Parameters
-        ----------
-        article_elem : ET.Element
-            The article XML element
-            
-        Returns
-        -------
-        str
-            PMC ID or None if not found
-        """
-        for article_id in article_elem.findall('.//article-id'):
-            if article_id.get('pub-id-type') == 'pmc':
-                return article_id.text
-        return None
     
     def _extract_pmid(self, article_elem: ET.Element) -> str:
         """
@@ -293,42 +189,24 @@ class NcbiAPI:
 
 def search_dandi_articles(verbose: bool = False) -> list[dict]:
     # Initialize API (replace with your email)
-    api = NcbiAPI(email="paul.wesley.adkisson@gmail.com")
-    
+    searcher = PMCSearcher(email="paul.wesley.adkisson@gmail.com")
+
     # Search queries for DANDI-related articles
-    database_to_queries = {
-        "pubmed": [
-            '"DANDI Archive"[tiab:~0]',
-            '"Distributed Archives for Neurophysiology Data Integration"[tiab:~0]'
-            '"DANDI:"[tiab:~0]',
-        ],
-        "pmc": [
-            '"DANDI Archive"',
-            '"Distributed Archives for Neurophysiology Data Integration"',
-        ]
-    }
+    queries = [
+        '"DANDI Archive"',
+        '"Distributed Archives for Neurophysiology Data Integration"',
+    ]
     all_articles = []
 
-    for database, queries in database_to_queries.items():
+    if verbose:
+        print(f"Searching PMC for DANDI-related articles...")
+    for query in queries:
         if verbose:
-            print(f"Searching {database} for DANDI-related articles...")
-
-        for query in queries:
-            pmids = api.get_pmids(query, max_results=100, database=database)
-            if verbose:
-                print(f"Found {len(pmids)} articles for query: {query}")
-
-            if pmids:
-                articles = api.get_article_details(pmids, database=database)
-                all_articles.extend(articles)
-                if verbose:
-                    print(f"Retrieved details for {len(articles)} articles.")
-            else:
-                if verbose:
-                    print("No articles found for this query.")
-
-            # Rate limiting - be nice to NCBI servers
-            time.sleep(1)
+            print(f"Querying PMC with: {query}")
+        articles = searcher.search(query=query, max_results=100)
+        all_articles.extend(articles)
+        # Rate limiting - be nice to NCBI servers
+        time.sleep(1)
     
     return all_articles
 
