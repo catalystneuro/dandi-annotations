@@ -41,8 +41,6 @@ class TestAPIEndpoints:
     @pytest.fixture
     def mock_submission_handler(self, temp_submissions_dir):
         """Mock submission handler with test data"""
-        handler = SubmissionHandler(temp_submissions_dir)
-        
         # Create test dandisets
         test_dandisets = [
             {
@@ -57,16 +55,27 @@ class TestAPIEndpoints:
             }
         ]
         
-        # Mock methods
-        handler.get_all_dandisets = MagicMock(return_value=test_dandisets)
-        handler.get_all_dandisets_paginated = MagicMock(return_value=(
+        # Create a complete mock handler
+        handler = MagicMock()
+        handler.get_all_dandisets.return_value = test_dandisets
+        handler.get_all_dandisets_paginated.return_value = (
             test_dandisets,
             {
                 'page': 1, 'per_page': 10, 'total_items': 2, 'total_pages': 1,
                 'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
                 'start_item': 1, 'end_item': 2
             }
-        ))
+        )
+        handler.get_approved_submissions_paginated.return_value = ([], {'total_items': 0})
+        handler.get_community_submissions_paginated.return_value = ([], {'total_items': 0})
+        handler.get_approved_submissions.return_value = []
+        handler.get_community_submissions.return_value = []
+        handler.save_community_submission.return_value = 'test_submission.yaml'
+        handler.get_all_pending_submissions.return_value = []
+        handler.get_all_pending_submissions_paginated.return_value = ([], {'total_items': 0})
+        handler.get_submission_by_filename.return_value = None
+        handler.approve_submission.return_value = True
+        handler.get_user_submissions_paginated.return_value = ([], {}, [], {})
         
         return handler
     

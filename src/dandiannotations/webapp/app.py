@@ -36,6 +36,34 @@ Session(app)
 # Register API blueprint
 app.register_blueprint(api_bp)
 
+# Global error handlers for API routes
+@app.errorhandler(404)
+def handle_404(error):
+    """Handle 404 errors - return JSON for API routes, HTML for web routes"""
+    if request.path.startswith('/api/'):
+        from dandiannotations.webapp.api.responses import not_found_response
+        return not_found_response("API endpoint")
+    # For non-API routes, use default Flask error page
+    return error, 404
+
+@app.errorhandler(405)
+def handle_405(error):
+    """Handle 405 errors - return JSON for API routes, HTML for web routes"""
+    if request.path.startswith('/api/'):
+        from dandiannotations.webapp.api.responses import error_response
+        return error_response("Method not allowed", "METHOD_NOT_ALLOWED", 405)
+    # For non-API routes, use default Flask error page
+    return error, 405
+
+@app.errorhandler(500)
+def handle_500(error):
+    """Handle 500 errors - return JSON for API routes, HTML for web routes"""
+    if request.path.startswith('/api/'):
+        from dandiannotations.webapp.api.responses import internal_error_response
+        return internal_error_response("Internal server error")
+    # For non-API routes, use default Flask error page
+    return error, 500
+
 # Configuration
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'submissions')
 submission_handler = SubmissionHandler(SUBMISSIONS_DIR)

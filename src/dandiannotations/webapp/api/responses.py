@@ -73,7 +73,7 @@ def error_response(
 
 def validation_error_response(
     validation_errors: Union[str, Dict[str, Any], list],
-    status_code: int = 422
+    status_code: int = 400
 ) -> tuple:
     """
     Create a validation error response

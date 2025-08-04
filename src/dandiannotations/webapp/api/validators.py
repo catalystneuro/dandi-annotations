@@ -318,6 +318,11 @@ def validate_user_registration(data: Dict[str, Any]) -> Tuple[bool, Optional[str
     if len(password) < 6:
         return False, "Password must be at least 6 characters long", None
     
+    # Check password confirmation if provided
+    if 'confirm_password' in data:
+        if data['password'] != data['confirm_password']:
+            return False, "Passwords do not match", None
+    
     return True, None, None
 
 

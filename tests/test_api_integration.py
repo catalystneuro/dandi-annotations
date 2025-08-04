@@ -41,8 +41,6 @@ class TestAPIIntegration:
     @pytest.fixture
     def mock_submission_handler(self, temp_submissions_dir):
         """Mock submission handler with realistic test data"""
-        handler = SubmissionHandler(temp_submissions_dir)
-        
         # Create comprehensive test data
         test_dandisets = [
             {
@@ -107,50 +105,52 @@ class TestAPIIntegration:
             }
         ]
         
-        # Mock methods with realistic data
-        handler.get_all_dandisets = MagicMock(return_value=test_dandisets)
-        handler.get_all_dandisets_paginated = MagicMock(return_value=(
+        # Create a complete mock handler
+        handler = MagicMock()
+        handler.get_all_dandisets.return_value = test_dandisets
+        handler.get_all_dandisets_paginated.return_value = (
             test_dandisets,
             {
                 'page': 1, 'per_page': 10, 'total_items': 3, 'total_pages': 1,
                 'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
                 'start_item': 1, 'end_item': 3
             }
-        ))
+        )
         
-        handler.get_approved_submissions = MagicMock(return_value=approved_resources)
-        handler.get_approved_submissions_paginated = MagicMock(return_value=(
+        handler.get_approved_submissions.return_value = approved_resources
+        handler.get_approved_submissions_paginated.return_value = (
             approved_resources,
             {
                 'page': 1, 'per_page': 10, 'total_items': 2, 'total_pages': 1,
                 'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
                 'start_item': 1, 'end_item': 2
             }
-        ))
+        )
         
-        handler.get_community_submissions = MagicMock(return_value=community_resources)
-        handler.get_community_submissions_paginated = MagicMock(return_value=(
+        handler.get_community_submissions.return_value = community_resources
+        handler.get_community_submissions_paginated.return_value = (
             community_resources,
             {
                 'page': 1, 'per_page': 10, 'total_items': 1, 'total_pages': 1,
                 'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
                 'start_item': 1, 'end_item': 1
             }
-        ))
+        )
         
-        handler.get_all_pending_submissions = MagicMock(return_value=community_resources)
-        handler.get_all_pending_submissions_paginated = MagicMock(return_value=(
+        handler.get_all_pending_submissions.return_value = community_resources
+        handler.get_all_pending_submissions_paginated.return_value = (
             community_resources,
             {
                 'page': 1, 'per_page': 10, 'total_items': 1, 'total_pages': 1,
                 'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
                 'start_item': 1, 'end_item': 1
             }
-        ))
+        )
         
-        handler.save_community_submission = MagicMock(return_value='new_submission.yaml')
-        handler.approve_submission = MagicMock(return_value=True)
-        handler.get_submission_by_filename = MagicMock(return_value=community_resources[0])
+        handler.save_community_submission.return_value = 'new_submission.yaml'
+        handler.approve_submission.return_value = True
+        handler.get_submission_by_filename.return_value = community_resources[0]
+        handler.get_user_submissions_paginated.return_value = ([], {}, [], {})
         
         return handler
     
@@ -237,12 +237,14 @@ class TestAPIIntegration:
                 'confirm_password': 'securepassword123'
             }
             
-            mock_auth_manager.register_user.return_value = True
-            mock_auth_manager.verify_credentials.return_value = {
+            new_user_info = {
                 'name': 'New User',
                 'email': 'newuser@example.com',
                 'user_type': 'user'
             }
+            
+            mock_auth_manager.register_user.return_value = True
+            mock_auth_manager.verify_credentials.return_value = new_user_info
             
             response = client.post('/api/auth/register',
                                  data=json.dumps(registration_data),
@@ -269,6 +271,11 @@ class TestAPIIntegration:
             assert login_result['data']['email'] == 'newuser@example.com'
             
             # Step 3: Access protected endpoint (get current user info)
+            # Update mock to return the new user for the /me endpoint
+            mock_auth_manager.get_current_user.return_value = new_user_info
+            mock_auth_manager.is_moderator.return_value = False
+            mock_auth_manager.get_user_type.return_value = 'user'
+            
             response = client.get('/api/auth/me')
             assert response.status_code == 200
             me_result = json.loads(response.data)

@@ -308,7 +308,10 @@ def submit_resource(dandiset_id):
         # Validate resource submission data
         is_valid, error_msg, validation_details = validate_resource_submission(data)
         if not is_valid:
-            return validation_error_response(error_msg, details=validation_details)
+            if validation_details:
+                return validation_error_response(validation_details)
+            else:
+                return validation_error_response(error_msg)
         
         # Create annotation contributor
         contributor_data = {
@@ -323,16 +326,30 @@ def submit_resource(dandiset_id):
         if data.get('contributor_url'):
             contributor_data['url'] = data['contributor_url']
         
+        # Normalize dandiset_id to 6-digit format for Pydantic validation
+        normalized_dandiset_id = dandiset_id
+        if dandiset_id.startswith('dandiset_'):
+            normalized_dandiset_id = dandiset_id.split('_')[1]
+        
+        # Normalize relation and resourceType to include dcite: prefix if not present
+        relation = data['relation']
+        if not relation.startswith('dcite:'):
+            relation = f"dcite:{relation}"
+        
+        resource_type = data['resource_type']
+        if not resource_type.startswith('dcite:'):
+            resource_type = f"dcite:{resource_type}"
+        
         # Create external resource data
         resource_data = {
-            'dandiset_id': dandiset_id,
+            'dandiset_id': normalized_dandiset_id,
             'annotation_contributor': contributor_data,
             'annotation_date': datetime.now().astimezone().isoformat(),
             'name': data['resource_name'],
             'url': data['resource_url'],
             'repository': data['repository'],
-            'relation': data['relation'],
-            'resourceType': data['resource_type'],
+            'relation': relation,
+            'resourceType': resource_type,
             'schemaKey': 'ExternalResource'
         }
         
@@ -490,7 +507,10 @@ def approve_submission(dandiset_id, filename):
         # Validate moderator approval data
         is_valid, error_msg, validation_details = validate_moderator_approval(data)
         if not is_valid:
-            return validation_error_response(error_msg, details=validation_details)
+            if validation_details:
+                return validation_error_response(validation_details)
+            else:
+                return validation_error_response(error_msg)
         
         # Prepare moderator info
         moderator_info = {
@@ -676,7 +696,10 @@ def register():
         # Validate registration data
         is_valid, error_msg, validation_details = validate_user_registration(data)
         if not is_valid:
-            return validation_error_response(error_msg, details=validation_details)
+            if validation_details:
+                return validation_error_response(validation_details)
+            else:
+                return validation_error_response(error_msg)
         
         email = data['email']
         password = data['password']
