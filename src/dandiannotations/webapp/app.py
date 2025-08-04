@@ -390,6 +390,63 @@ def approve_submission(dandiset_id, filename):
         # Redirect back to moderation page
         return redirect(url_for('moderate'))
 
+@app.route('/delete/<dandiset_id>/<filename>/<status>', methods=['POST'])
+@login_required
+def delete_submission(dandiset_id, filename, status):
+    """Delete a submission with moderator authentication"""
+    # Check if user is a moderator
+    if not auth_manager.is_moderator():
+        flash('Access denied. Moderator privileges required.', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Validate parameters
+        if status not in ['community', 'approved']:
+            flash('Invalid submission status', 'error')
+            return redirect(url_for('moderate'))
+        
+        # Get current user info for audit trail
+        current_user = auth_manager.get_current_user()
+        if not current_user:
+            flash('User information not available', 'error')
+            return redirect(url_for('moderate'))
+        
+        moderator_info = {
+            'name': current_user.get('name', 'Unknown Moderator'),
+            'email': current_user.get('email'),
+            'identifier': current_user.get('identifier'),
+            'url': current_user.get('url')
+        }
+        
+        # Get submission details for better success message
+        submission = submission_handler.get_submission_by_filename(dandiset_id, filename, status)
+        
+        # Perform deletion
+        success = submission_handler.delete_submission(dandiset_id, filename, status, moderator_info)
+        
+        if success:
+            if submission:
+                resource_name = submission.get('name', 'Unknown Resource')
+                display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+                status_text = "pending" if status == 'community' else "approved"
+                flash(f'Successfully deleted {status_text} submission "{resource_name}" for {display_id}', 'success')
+            else:
+                flash(f'Successfully deleted submission: {filename}', 'success')
+        else:
+            flash(f'Failed to delete submission: {filename}', 'error')
+            
+    except Exception as e:
+        flash(f'Error deleting submission: {str(e)}', 'error')
+    
+    # Determine where to redirect based on the referring page
+    referrer = request.referrer
+    if referrer and 'dandiset' in referrer:
+        # Redirect back to dandiset resources page
+        return redirect(url_for('dandiset_resources', dandiset_id=dandiset_id))
+    else:
+        # Redirect back to moderation page
+        return redirect(url_for('moderate'))
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page for moderators"""

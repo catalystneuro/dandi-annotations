@@ -461,3 +461,72 @@ class SubmissionHandler:
         approved_paginated, approved_pagination = self._paginate_list(approved_submissions, approved_page, per_page)
         
         return community_paginated, community_pagination, approved_paginated, approved_pagination
+    
+    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
+        """
+        Delete a submission and move it to backup folder with audit trail
+        
+        Args:
+            dandiset_id: The dandiset identifier
+            filename: The submission filename to delete
+            status: 'community' or 'approved'
+            moderator_info: Information about the moderator performing deletion
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get source directory based on status
+            if status == 'community':
+                source_dir = self._get_community_dir(dandiset_id)
+            elif status == 'approved':
+                source_dir = self._get_approved_dir(dandiset_id)
+            else:
+                raise ValueError(f"Invalid status: {status}. Must be 'community' or 'approved'")
+            
+            # Get source file path
+            source_path = source_dir / filename
+            
+            if not source_path.exists():
+                raise FileNotFoundError(f"Submission file not found: {filename}")
+            
+            # Create deleted directory structure
+            dandiset_dir = self._get_dandiset_dir(dandiset_id)
+            deleted_dir = dandiset_dir / "deleted" / status
+            deleted_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate timestamped filename for backup
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"deleted_{timestamp}_{filename}"
+            backup_path = deleted_dir / backup_filename
+            
+            # Load the existing submission data
+            with open(source_path, 'r', encoding='utf-8') as file:
+                submission_data = yaml.safe_load(file)
+            
+            # Add deletion metadata
+            submission_data['deletion_info'] = {
+                'deleted_by': {
+                    'name': moderator_info.get('name', 'Unknown Moderator'),
+                    'email': moderator_info.get('email'),
+                    'identifier': moderator_info.get('identifier'),
+                    'url': moderator_info.get('url'),
+                    'schemaKey': 'AnnotationContributor'
+                },
+                'deletion_date': datetime.now().astimezone().isoformat(),
+                'original_filename': filename,
+                'original_status': status
+            }
+            
+            # Save the updated data to the backup folder
+            with open(backup_path, 'w', encoding='utf-8') as file:
+                yaml.dump(submission_data, file, default_flow_style=False, 
+                         allow_unicode=True, sort_keys=False, indent=2)
+            
+            # Remove the original file
+            source_path.unlink()
+            
+            return True
+            
+        except Exception as e:
+            raise Exception(f"Error deleting submission: {str(e)}")
