@@ -17,6 +17,9 @@ from dandiannotations.webapp.utils.schema_utils import get_resource_relation_opt
 from dandiannotations.webapp.utils.auth import AuthManager, login_required
 from dandiannotations.models.models import ExternalResource, AnnotationContributor
 
+# Import API blueprint
+from dandiannotations.webapp.api import api_bp
+
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'
 
@@ -29,6 +32,9 @@ app.config['SESSION_KEY_PREFIX'] = 'dandi_auth:'
 
 # Initialize session
 Session(app)
+
+# Register API blueprint
+app.register_blueprint(api_bp)
 
 # Configuration
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'submissions')
