@@ -127,12 +127,32 @@
                     </div>
 
                     <div class="mb-3">
-                        <input type="email" 
-                               class="form-control" 
-                               name="contributor_email" 
-                               placeholder="Contributor Email"
-                               id="contributor_email"
-                               required>
+                        {% if is_authenticated %}
+                            <div class="input-group">
+                                <input type="email" 
+                                       class="form-control" 
+                                       name="contributor_email" 
+                                       value="{{ current_user.email }}"
+                                       id="contributor_email"
+                                       readonly
+                                       required>
+                                <span class="input-group-text">
+                                    <i class="fas fa-lock text-muted" 
+                                       data-bs-toggle="tooltip" 
+                                       title="Email is locked to your account email"></i>
+                                </span>
+                            </div>
+                            <div class="form-text text-muted">
+                                <i class="fas fa-info-circle"></i> Using your account email
+                            </div>
+                        {% else %}
+                            <input type="email" 
+                                   class="form-control" 
+                                   name="contributor_email" 
+                                   placeholder="Contributor Email"
+                                   id="contributor_email"
+                                   required>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">

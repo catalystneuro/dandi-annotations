@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Create an account to track your submissions and contribute to the DANDI community.
+                    </p>
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" 
+                                   class="form-control" 
+                                   id="email" 
+                                   name="email" 
+                                   required 
+                                   placeholder="your.email@example.com"
+                                   value="{{ request.form.get('email', '') }}">
+                            <div class="form-text">
+                                Your email will be used as your username and to track your submissions.
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="password" 
+                                   name="password" 
+                                   required 
+                                   placeholder="Enter your password">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="confirm_password" 
+                                   name="confirm_password" 
+                                   required 
+                                   placeholder="Confirm your password">
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-plus"></i> Create Account
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <p class="mb-0">Already have an account?</p>
+                        <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-sign-in-alt"></i> Log In
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -47,7 +47,9 @@ def inject_auth_status():
     """Make authentication status available to all templates"""
     return {
         'is_authenticated': auth_manager.is_authenticated(),
-        'current_user': auth_manager.get_current_user()
+        'current_user': auth_manager.get_current_user(),
+        'is_moderator': auth_manager.is_moderator(),
+        'user_type': auth_manager.get_user_type()
     }
 
 def validate_email(email):
@@ -89,17 +91,26 @@ def index():
         # Get all dandisets for total statistics (not paginated)
         all_dandisets = submission_handler.get_all_dandisets()
         
-        # Calculate total statistics
-        total_community = sum(ds['community_count'] for ds in all_dandisets)
+        # Calculate total statistics based on authentication status
         total_approved = sum(ds['approved_count'] for ds in all_dandisets)
         total_dandisets = len(all_dandisets)
+        
+        # For authenticated moderators, show both approved and pending
+        # For public users, only show approved resources
+        if auth_manager.is_authenticated():
+            total_community = sum(ds['community_count'] for ds in all_dandisets)
+            show_community_stats = True
+        else:
+            total_community = 0
+            show_community_stats = False
         
         return render_template('homepage.html',
                              all_dandisets=paginated_dandisets,
                              pagination=pagination_info,
                              total_community=total_community,
                              total_approved=total_approved,
-                             total_dandisets=total_dandisets)
+                             total_dandisets=total_dandisets,
+                             show_community_stats=show_community_stats)
     except Exception as e:
         flash(f'Error loading homepage: {str(e)}', 'error')
         return render_template('homepage.html',
@@ -107,7 +118,8 @@ def index():
                              pagination={'page': 1, 'total_pages': 1, 'has_prev': False, 'has_next': False},
                              total_community=0,
                              total_approved=0,
-                             total_dandisets=0)
+                             total_dandisets=0,
+                             show_community_stats=False)
 
 @app.route('/submit')
 def submit_form():
@@ -228,11 +240,24 @@ def dandiset_resources(dandiset_id):
         community_page = request.args.get('community_page', 1, type=int)
         per_page = 9  # 9 resources per page for 3x3 grid
         
-        # Get paginated submissions
-        community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
-            dandiset_id, community_page, per_page)
+        # Always get approved submissions
         approved_submissions, approved_pagination = submission_handler.get_approved_submissions_paginated(
             dandiset_id, approved_page, per_page)
+        
+        # Always get community submission counts, but only get actual data for authenticated moderators
+        if auth_manager.is_authenticated():
+            # Moderators get full community submissions data
+            community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
+                dandiset_id, community_page, per_page)
+        else:
+            # Public users get counts only, no actual submission data
+            all_community_submissions = submission_handler.get_community_submissions(dandiset_id)
+            community_submissions = []
+            community_pagination = {
+                'page': 1, 'per_page': per_page, 'total_items': len(all_community_submissions), 'total_pages': 1,
+                'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
+                'start_item': 0, 'end_item': 0
+            }
         
         # Get all dandisets for navigation
         all_dandisets = submission_handler.get_all_dandisets()
@@ -253,8 +278,13 @@ def dandiset_resources(dandiset_id):
         return redirect(url_for('index'))
 
 @app.route('/moderate')
+@login_required
 def moderate():
     """Moderation interface for all pending submissions"""
+    # Check if user is a moderator
+    if not auth_manager.is_moderator():
+        flash('Access denied. Moderator privileges required.', 'error')
+        return redirect(url_for('index'))
     try:
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
@@ -390,6 +420,83 @@ def login():
         else:
             flash('Invalid username or password', 'error')
             return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration page"""
+    if request.method == 'GET':
+        # Show registration form
+        return render_template('register.html')
+    
+    elif request.method == 'POST':
+        # Process registration
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        
+        if not email or not password:
+            flash('Email and password are required', 'error')
+            return render_template('register.html')
+        
+        # Validate email format
+        if not validate_email(email):
+            flash('Invalid email format', 'error')
+            return render_template('register.html')
+        
+        # Check password confirmation
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+        
+        # Attempt to register user
+        if auth_manager.register_user(email, password):
+            # Auto-login after successful registration
+            user_info = auth_manager.verify_credentials(email, password)
+            if user_info:
+                auth_manager.login_user(user_info)
+                flash(f'Welcome, {user_info["name"]}! Your account has been created.', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Registration successful! Please log in.', 'success')
+                return redirect(url_for('login'))
+        else:
+            flash('Email already exists. Please use a different email or log in.', 'error')
+            return render_template('register.html')
+
+@app.route('/my-submissions')
+@login_required
+def my_submissions():
+    """Display current user's submissions"""
+    try:
+        current_user = auth_manager.get_current_user()
+        if not current_user:
+            flash('You must be logged in to view your submissions', 'error')
+            return redirect(url_for('login'))
+        
+        user_email = current_user['email']
+        
+        # Get pagination parameters
+        community_page = request.args.get('community_page', 1, type=int)
+        approved_page = request.args.get('approved_page', 1, type=int)
+        per_page = 9  # 9 submissions per page for 3x3 grid
+        
+        # Get paginated user submissions
+        community_submissions, community_pagination, approved_submissions, approved_pagination = \
+            submission_handler.get_user_submissions_paginated(user_email, community_page, approved_page, per_page)
+        
+        # Get all dandisets for navigation
+        all_dandisets = submission_handler.get_all_dandisets()
+        
+        return render_template('my_submissions.html',
+                             community_submissions=community_submissions,
+                             approved_submissions=approved_submissions,
+                             community_pagination=community_pagination,
+                             approved_pagination=approved_pagination,
+                             all_dandisets=all_dandisets,
+                             user_email=user_email)
+    except Exception as e:
+        flash(f'Error loading your submissions: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():

@@ -397,3 +397,67 @@ class SubmissionHandler:
         """
         all_submissions = self.get_all_pending_submissions()
         return self._paginate_list(all_submissions, page, per_page)
+    
+    def get_user_submissions(self, user_email: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """
+        Get all submissions (community and approved) for a specific user
+        
+        Args:
+            user_email: Email address of the user
+            
+        Returns:
+            Tuple of (community_submissions, approved_submissions)
+        """
+        try:
+            community_submissions = []
+            approved_submissions = []
+            
+            # Iterate through all dandiset directories
+            for dandiset_dir in self.base_dir.iterdir():
+                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                    dandiset_id = dandiset_dir.name
+                    
+                    # Get community submissions for this dandiset
+                    dandiset_community = self.get_community_submissions(dandiset_id)
+                    for submission in dandiset_community:
+                        contributor_email = submission.get('annotation_contributor', {}).get('email', '')
+                        if contributor_email == user_email:
+                            submission['_dandiset_id'] = dandiset_id
+                            community_submissions.append(submission)
+                    
+                    # Get approved submissions for this dandiset
+                    dandiset_approved = self.get_approved_submissions(dandiset_id)
+                    for submission in dandiset_approved:
+                        contributor_email = submission.get('annotation_contributor', {}).get('email', '')
+                        if contributor_email == user_email:
+                            submission['_dandiset_id'] = dandiset_id
+                            approved_submissions.append(submission)
+            
+            # Sort by annotation_date (newest first)
+            community_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            approved_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            
+            return community_submissions, approved_submissions
+            
+        except Exception as e:
+            raise Exception(f"Error loading user submissions: {str(e)}")
+    
+    def get_user_submissions_paginated(self, user_email: str, community_page: int = 1, approved_page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Get paginated submissions for a specific user
+        
+        Args:
+            user_email: Email address of the user
+            community_page: Current page for community submissions
+            approved_page: Current page for approved submissions
+            per_page: Number of submissions per page
+            
+        Returns:
+            Tuple of (community_submissions, community_pagination, approved_submissions, approved_pagination)
+        """
+        community_submissions, approved_submissions = self.get_user_submissions(user_email)
+        
+        community_paginated, community_pagination = self._paginate_list(community_submissions, community_page, per_page)
+        approved_paginated, approved_pagination = self._paginate_list(approved_submissions, approved_page, per_page)
+        
+        return community_paginated, community_pagination, approved_paginated, approved_pagination
