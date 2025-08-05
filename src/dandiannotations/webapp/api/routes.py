@@ -116,7 +116,7 @@ def get_dandiset(dandiset_id):
         dandiset_info = None
         
         for dandiset in all_dandisets:
-            if dandiset.get('dandiset_id') == dandiset_id:
+            if dandiset.get('id') == dandiset_id:
                 dandiset_info = dandiset
                 break
         
