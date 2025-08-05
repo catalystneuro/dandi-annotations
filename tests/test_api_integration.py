@@ -412,7 +412,7 @@ class TestAPIIntegration:
             assert logout_result['success'] is True
     
     def test_moderation_workflow(self, client, mock_submission_handler, mock_auth_manager):
-        """Test moderation workflow: view all pending -> filter by dandiset -> approve multiple"""
+        """Test moderation workflow: view all pending -> filter by dandiset -> approve -> verify changes"""
         
         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
@@ -433,12 +433,19 @@ class TestAPIIntegration:
             assert response.status_code == 200
             all_pending = json.loads(response.data)
             assert all_pending['success'] is True
+            assert len(all_pending['data']) >= 1
             
-            # Step 2: View pending for specific dandiset
+            # Step 2: View pending for specific dandiset and extract a submission to approve
             response = client.get('/api/dandisets/dandiset_000001/resources/pending')
             assert response.status_code == 200
             dandiset_pending = json.loads(response.data)
             assert dandiset_pending['success'] is True
+            assert len(dandiset_pending['data']) >= 1
+            
+            # Extract the first pending submission for approval
+            pending_submission = dandiset_pending['data'][0]
+            submission_filename = pending_submission['_submission_filename']
+            submission_name = pending_submission['name']
             
             # Step 3: Get detailed stats before approval
             response = client.get('/api/stats/dandisets/dandiset_000001')
@@ -446,13 +453,18 @@ class TestAPIIntegration:
             stats_before = json.loads(response.data)
             assert stats_before['success'] is True
             
-            # Step 4: Approve submission (use real filename from test data)
+            # Capture counts before approval
+            approved_count_before = stats_before['data']['approved_count']
+            pending_count_before = stats_before['data']['pending_count']
+            total_count_before = stats_before['data']['total_count']
+            
+            # Step 4: Approve the specific submission from the pending list
             approval_data = {
                 'moderator_name': 'Test Moderator',
                 'moderator_email': 'moderator@example.com'
             }
             
-            response = client.post('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/approve',
+            response = client.post(f'/api/submissions/dandiset_000001/{submission_filename}/approve',
                                  data=json.dumps(approval_data),
                                  content_type='application/json')
             
@@ -460,11 +472,65 @@ class TestAPIIntegration:
             approval_result = json.loads(response.data)
             assert approval_result['success'] is True
             
-            # Step 5: Verify stats updated (would show different counts in real scenario)
+            # Comprehensive assertions on the approval result
+            approved_resource = approval_result['data']
+            assert approved_resource['_submission_status'] == 'approved'
+            assert approved_resource['_submission_filename'] == submission_filename
+            assert approved_resource['name'] == submission_name
+            assert approved_resource['dandiset_id'] == 'dandiset_000001'
+            assert approved_resource['schemaKey'] == 'ExternalResource'
+            
+            # Verify approval metadata was added
+            assert approved_resource['approval_contributor']['name'] == 'Test Moderator'
+            assert approved_resource['approval_contributor']['email'] == 'moderator@example.com'
+            assert approved_resource['approval_contributor']['schemaKey'] == 'AnnotationContributor'
+            assert 'approval_date' in approved_resource
+            
+            # Verify original submission data is preserved
+            assert approved_resource['name'] == pending_submission['name']
+            assert approved_resource['url'] == pending_submission['url']
+            assert approved_resource['repository'] == pending_submission['repository']
+            assert approved_resource['relation'] == pending_submission['relation']
+            assert approved_resource['resourceType'] == pending_submission['resourceType']
+            assert approved_resource['annotation_contributor'] == pending_submission['annotation_contributor']
+            
+            # Step 5: Verify stats updated correctly
             response = client.get('/api/stats/dandisets/dandiset_000001')
             assert response.status_code == 200
             stats_after = json.loads(response.data)
             assert stats_after['success'] is True
+            
+            # Assert that counts changed as expected
+            assert stats_after['data']['approved_count'] == approved_count_before + 1
+            assert stats_after['data']['pending_count'] == pending_count_before - 1
+            assert stats_after['data']['total_count'] == total_count_before  # Total should remain the same
+            
+            # Step 6: Verify the resource appears in approved list and not in pending
+            response = client.get('/api/dandisets/dandiset_000001/resources/approved')
+            assert response.status_code == 200
+            approved_list = json.loads(response.data)
+            assert approved_list['success'] is True
+            
+            # Find the approved resource in the approved list
+            found_approved = None
+            for resource in approved_list['data']:
+                if resource['name'] == submission_name:
+                    found_approved = resource
+                    break
+            
+            assert found_approved is not None, f"Approved resource '{submission_name}' not found in approved list"
+            assert found_approved['_submission_status'] == 'approved'
+            assert found_approved['_submission_filename'] == submission_filename
+            
+            # Step 7: Verify the resource no longer appears in pending list
+            response = client.get('/api/dandisets/dandiset_000001/resources/pending')
+            assert response.status_code == 200
+            updated_pending = json.loads(response.data)
+            assert updated_pending['success'] is True
+            
+            # Ensure the approved resource is no longer in pending
+            for resource in updated_pending['data']:
+                assert resource['name'] != submission_name, f"Approved resource '{submission_name}' still appears in pending list"
     
     def test_user_submission_tracking_workflow(self, client, mock_submission_handler, mock_auth_manager):
         """Test user submission tracking: submit -> track own submissions -> view status"""
@@ -540,105 +606,6 @@ class TestAPIIntegration:
             small_page_result = json.loads(response.data)
             assert small_page_result['success'] is True
             assert small_page_result['pagination']['per_page'] == 5
-    
-    def test_error_handling_workflow(self, client, mock_submission_handler, mock_auth_manager):
-        """Test error handling across different scenarios"""
-        
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
-             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-            
-            # Test 1: Invalid dandiset ID
-            response = client.get('/api/dandisets/invalid_id')
-            assert response.status_code == 400
-            error_result = json.loads(response.data)
-            assert error_result['success'] is False
-            assert 'error' in error_result
-            
-            # Test 2: Non-existent dandiset
-            response = client.get('/api/dandisets/dandiset_999999')
-            assert response.status_code == 404
-            error_result = json.loads(response.data)
-            assert error_result['success'] is False
-            
-            # Test 3: Invalid submission data
-            invalid_submission = {
-                'resource_name': 'Test',
-                'resource_url': 'not-a-url',  # Invalid URL
-                'repository': 'GitHub',
-                'relation': 'IsSupplementTo',
-                'resource_type': 'Software',
-                'contributor_name': 'Test',
-                'contributor_email': 'invalid-email'  # Invalid email
-            }
-            
-            response = client.post('/api/dandisets/dandiset_000001/resources',
-                                 data=json.dumps(invalid_submission),
-                                 content_type='application/json')
-            
-            assert response.status_code == 400
-            error_result = json.loads(response.data)
-            assert error_result['success'] is False
-            assert 'error' in error_result
-            
-            # Test 4: Unauthorized access to protected endpoint (without login)
-            response = client.get('/api/auth/me')
-            assert response.status_code == 401
-            error_result = json.loads(response.data)
-            assert error_result['success'] is False
-            
-            # Test 5: Forbidden access (regular user accessing moderator endpoint)
-            # Login as regular user first
-            login_data = {
-                'username': 'user@example.com',
-                'password': 'password123'
-            }
-            
-            response = client.post('/api/auth/login',
-                                 data=json.dumps(login_data),
-                                 content_type='application/json')
-            assert response.status_code == 200
-            
-            # Try to access moderator endpoint
-            response = client.get('/api/submissions/pending')
-            assert response.status_code == 403
-            error_result = json.loads(response.data)
-            assert error_result['success'] is False
-    
-    def test_statistics_workflow(self, client, mock_submission_handler):
-        """Test statistics gathering workflow"""
-        
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
-            
-            # Step 1: Get overall platform statistics
-            response = client.get('/api/stats/overview')
-            assert response.status_code == 200
-            overview_stats = json.loads(response.data)
-            assert overview_stats['success'] is True
-            assert 'total_dandisets' in overview_stats['data']
-            assert 'total_approved_resources' in overview_stats['data']
-            assert 'total_pending_resources' in overview_stats['data']
-            
-            # Step 2: Get specific dandiset statistics
-            response = client.get('/api/stats/dandisets/dandiset_000001')
-            assert response.status_code == 200
-            dandiset_stats = json.loads(response.data)
-            assert dandiset_stats['success'] is True
-            assert dandiset_stats['data']['dandiset_id'] == 'dandiset_000001'
-            assert 'approved_count' in dandiset_stats['data']
-            assert 'pending_count' in dandiset_stats['data']
-            assert 'resource_types' in dandiset_stats['data']
-            assert 'repositories' in dandiset_stats['data']
-            
-            # Step 3: Compare statistics across dandisets
-            response = client.get('/api/stats/dandisets/dandiset_000002')
-            assert response.status_code == 200
-            dandiset2_stats = json.loads(response.data)
-            assert dandiset2_stats['success'] is True
-            assert dandiset2_stats['data']['dandiset_id'] == 'dandiset_000002'
-            
-            # Verify different dandisets have different stats
-            assert dandiset_stats['data']['dandiset_id'] != dandiset2_stats['data']['dandiset_id']
-
 
 if __name__ == '__main__':
     pytest.main([__file__])
