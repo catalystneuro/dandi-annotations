@@ -40,22 +40,6 @@ MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config',
 auth_manager = AuthManager(MODERATORS_CONFIG_PATH)
 
 
-def require_authentication():
-    """Helper function to check authentication for protected endpoints"""
-    if not auth_manager.is_authenticated():
-        return unauthorized_response("Authentication required")
-    return None
-
-
-def require_moderator():
-    """Helper function to check moderator privileges"""
-    auth_error = require_authentication()
-    if auth_error:
-        return auth_error
-    
-    if not auth_manager.is_moderator():
-        return forbidden_response("Moderator privileges required")
-    return None
 
 
 # ============================================================================
@@ -111,14 +95,8 @@ def get_dandiset(dandiset_id):
         if not is_valid:
             return validation_error_response(error_msg)
         
-        # Get all dandisets to find the specific one
-        all_dandisets = submission_handler.get_all_dandisets()
-        dandiset_info = None
-        
-        for dandiset in all_dandisets:
-            if dandiset.get('id') == dandiset_id:
-                dandiset_info = dandiset
-                break
+        # Get specific dandiset
+        dandiset_info = submission_handler.get_dandiset(dandiset_id)
         
         if not dandiset_info:
             return not_found_response("Dandiset")
@@ -156,23 +134,11 @@ def get_dandiset_resources(dandiset_id):
         if not is_valid:
             return validation_error_response(error_msg)
         
-        # Get approved resources (always available)
-        approved_submissions, approved_pagination = submission_handler.get_approved_submissions_paginated(
-            dandiset_id, validated_params['page'], validated_params['per_page']
+        # Get all resources (include community submissions only if authenticated)
+        include_community = auth_manager.is_authenticated()
+        all_resources, pagination_info = submission_handler.get_all_submissions_paginated(
+            dandiset_id, validated_params['page'], validated_params['per_page'], include_community
         )
-        
-        # Get community resources if authenticated
-        community_submissions = []
-        community_pagination = {'total_items': 0}
-        
-        if auth_manager.is_authenticated():
-            community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
-                dandiset_id, validated_params['page'], validated_params['per_page']
-            )
-        
-        # Combine resources
-        all_resources = approved_submissions + community_submissions
-        total_items = approved_pagination['total_items'] + community_pagination['total_items']
         
         # Serialize data
         serialized_resources = serialize_external_resources(all_resources)
@@ -181,7 +147,7 @@ def get_dandiset_resources(dandiset_id):
             data=serialized_resources,
             page=validated_params['page'],
             per_page=validated_params['per_page'],
-            total_items=total_items,
+            total_items=pagination_info['total_items'],
             message="Dandiset resources retrieved successfully"
         )
         
@@ -237,9 +203,9 @@ def get_dandiset_pending_resources(dandiset_id):
     Get pending resources for a specific dandiset (authentication required)
     """
     # Check authentication
-    auth_error = require_authentication()
+    auth_error = auth_manager.require_authentication()
     if auth_error:
-        return auth_error
+        return unauthorized_response(auth_error['error'])
     
     try:
         # Validate dandiset ID
@@ -392,38 +358,21 @@ def get_resource(resource_id):
     Get specific resource details
     """
     try:
-        # Try to find the resource in both approved and community submissions
-        # This is a simplified approach - in a real implementation, you might want
-        # to maintain an index of all resources
+        # Find the resource using the new method
+        resource = submission_handler.get_resource_by_id(resource_id)
         
-        # Search through all dandisets for this resource
-        all_dandisets = submission_handler.get_all_dandisets()
+        if not resource:
+            return not_found_response("Resource")
         
-        for dandiset in all_dandisets:
-            dandiset_id = dandiset['dandiset_id']
-            
-            # Check approved submissions
-            approved_submissions = submission_handler.get_approved_submissions(dandiset_id)
-            for submission in approved_submissions:
-                if submission.get('_filename', '').replace('.yaml', '') == resource_id:
-                    serialized_resource = serialize_external_resource(submission)
-                    return success_response(
-                        data=serialized_resource,
-                        message="Resource retrieved successfully"
-                    )
-            
-            # Check community submissions if authenticated
-            if auth_manager.is_authenticated():
-                community_submissions = submission_handler.get_community_submissions(dandiset_id)
-                for submission in community_submissions:
-                    if submission.get('_filename', '').replace('.yaml', '') == resource_id:
-                        serialized_resource = serialize_external_resource(submission)
-                        return success_response(
-                            data=serialized_resource,
-                            message="Resource retrieved successfully"
-                        )
+        # Check if user can access community submissions
+        if resource.get('_submission_status') == 'community' and not auth_manager.is_authenticated():
+            return not_found_response("Resource")
         
-        return not_found_response("Resource")
+        serialized_resource = serialize_external_resource(resource)
+        return success_response(
+            data=serialized_resource,
+            message="Resource retrieved successfully"
+        )
         
     except Exception as e:
         return internal_error_response(f"Error retrieving resource: {str(e)}")
@@ -440,9 +389,12 @@ def get_pending_submissions():
     Get all pending submissions (moderator only)
     """
     # Check moderator privileges
-    auth_error = require_moderator()
+    auth_error = auth_manager.require_moderator()
     if auth_error:
-        return auth_error
+        if auth_error['status_code'] == 401:
+            return unauthorized_response(auth_error['error'])
+        else:
+            return forbidden_response(auth_error['error'])
     
     try:
         # Get pagination parameters
@@ -481,9 +433,12 @@ def approve_submission(dandiset_id, filename):
     Approve a community submission (moderator only)
     """
     # Check moderator privileges
-    auth_error = require_moderator()
+    auth_error = auth_manager.require_moderator()
     if auth_error:
-        return auth_error
+        if auth_error['status_code'] == 401:
+            return unauthorized_response(auth_error['error'])
+        else:
+            return forbidden_response(auth_error['error'])
     
     try:
         # Validate content type
@@ -555,9 +510,9 @@ def get_user_submissions(user_email):
     Get submissions for a specific user (authentication required)
     """
     # Check authentication
-    auth_error = require_authentication()
+    auth_error = auth_manager.require_authentication()
     if auth_error:
-        return auth_error
+        return unauthorized_response(auth_error['error'])
     
     # Users can only view their own submissions
     current_user = auth_manager.get_current_user()
@@ -737,9 +692,9 @@ def get_current_user():
     Get current authenticated user information
     """
     # Check authentication
-    auth_error = require_authentication()
+    auth_error = auth_manager.require_authentication()
     if auth_error:
-        return auth_error
+        return unauthorized_response(auth_error['error'])
     
     try:
         current_user = auth_manager.get_current_user()
@@ -820,46 +775,8 @@ def get_dandiset_stats(dandiset_id):
         if not is_valid:
             return validation_error_response(error_msg)
         
-        # Get dandiset information
-        all_dandisets = submission_handler.get_all_dandisets()
-        dandiset_info = None
-        
-        for dandiset in all_dandisets:
-            if dandiset.get('id') == dandiset_id:
-                dandiset_info = dandiset
-                break
-        
-        if not dandiset_info:
-            return not_found_response("Dandiset")
-        
-        # Get detailed submissions for additional stats
-        approved_submissions = submission_handler.get_approved_submissions(dandiset_id)
-        community_submissions = submission_handler.get_community_submissions(dandiset_id)
-        
-        # Calculate detailed statistics
-        stats = {
-            'dandiset_id': dandiset_id,
-            'display_id': f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}",
-            'approved_count': len(approved_submissions),
-            'pending_count': len(community_submissions),
-            'total_count': len(approved_submissions) + len(community_submissions),
-            'unique_contributors': len(set(
-                submission.get('annotation_contributor', {}).get('name')
-                for submission in approved_submissions + community_submissions
-                if submission.get('annotation_contributor', {}).get('name')
-            )),
-            'resource_types': {},
-            'repositories': {}
-        }
-        
-        # Analyze resource types and repositories
-        all_submissions = approved_submissions + community_submissions
-        for submission in all_submissions:
-            resource_type = submission.get('resourceType', 'Unknown')
-            repository = submission.get('repository', 'Unknown')
-            
-            stats['resource_types'][resource_type] = stats['resource_types'].get(resource_type, 0) + 1
-            stats['repositories'][repository] = stats['repositories'].get(repository, 0) + 1
+        # Get dandiset statistics using the new method
+        stats = submission_handler.get_dandiset_stats(dandiset_id)
         
         # Serialize statistics
         serialized_stats = serialize_submission_stats(stats)

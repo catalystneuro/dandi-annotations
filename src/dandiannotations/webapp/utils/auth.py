@@ -175,6 +175,42 @@ class AuthManager:
         """Log out the current user by clearing session"""
         session.pop('authenticated', None)
         session.pop('user_info', None)
+    
+    def require_authentication(self):
+        """
+        Check if user is authenticated and return error response if not
+        
+        Returns:
+            Error response dict if not authenticated, None if authenticated
+        """
+        if not self.is_authenticated():
+            return {
+                'error': 'Authentication required',
+                'error_code': 'AUTHENTICATION_REQUIRED',
+                'status_code': 401
+            }
+        return None
+    
+    def require_moderator(self):
+        """
+        Check if user is authenticated and has moderator privileges
+        
+        Returns:
+            Error response dict if not authorized, None if authorized
+        """
+        # First check authentication
+        auth_error = self.require_authentication()
+        if auth_error:
+            return auth_error
+        
+        # Then check moderator privileges
+        if not self.is_moderator():
+            return {
+                'error': 'Moderator privileges required',
+                'error_code': 'INSUFFICIENT_PRIVILEGES',
+                'status_code': 403
+            }
+        return None
 
 
 def login_required(f):
