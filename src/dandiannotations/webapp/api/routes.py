@@ -559,9 +559,9 @@ def get_user_submissions(user_email):
     if auth_error:
         return auth_error
     
-    # Users can only view their own submissions unless they're moderators
+    # Users can only view their own submissions
     current_user = auth_manager.get_current_user()
-    if current_user['email'] != user_email and not auth_manager.is_moderator():
+    if current_user['email'] != user_email:
         return forbidden_response("You can only view your own submissions")
     
     try:
