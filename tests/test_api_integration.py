@@ -294,6 +294,9 @@ class TestAPIIntegration:
             assert submission_result['success'] is True
             assert submission_result['data']['name'] == 'Integration Test Resource'
             
+            # Capture the filename of the submitted resource
+            submitted_filename = submission_result['data']['filename']
+            
             # Step 2: View pending submissions (as moderator)
             response = client.get('/api/submissions/pending')
             assert response.status_code == 200
@@ -301,13 +304,13 @@ class TestAPIIntegration:
             assert pending_result['success'] is True
             assert len(pending_result['data']) >= 1
             
-            # Step 3: Approve the submission (use real filename from test data)
+            # Step 3: Approve the SAME submission that was just submitted
             approval_data = {
                 'moderator_name': 'Test Moderator',
                 'moderator_email': 'moderator@example.com'
             }
             
-            response = client.post('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/approve',
+            response = client.post(f'/api/submissions/dandiset_000001/{submitted_filename}/approve',
                                  data=json.dumps(approval_data),
                                  content_type='application/json')
             
@@ -321,6 +324,43 @@ class TestAPIIntegration:
             approved_result = json.loads(response.data)
             assert approved_result['success'] is True
             assert len(approved_result['data']) >= 1
+            
+            # Find the approved resource that matches our submitted resource
+            approved_resource = None
+            for resource in approved_result['data']:
+                if resource['name'] == 'Integration Test Resource':
+                    approved_resource = resource
+                    break
+            
+            # Comprehensive assertions on the approved resource
+            assert approved_resource is not None, "Submitted resource not found in approved resources"
+            
+            # Verify original submission data is preserved
+            assert approved_resource['name'] == 'Integration Test Resource'
+            assert approved_resource['url'] == 'https://github.com/test/integration'
+            assert approved_resource['repository'] == 'GitHub'
+            assert approved_resource['relation'] == 'dcite:IsSupplementTo'
+            assert approved_resource['resourceType'] == 'dcite:Software'
+            assert approved_resource['dandiset_id'] == 'dandiset_000001'
+            assert approved_resource['schemaKey'] == 'ExternalResource'
+            
+            # Verify contributor information
+            assert approved_resource['annotation_contributor']['name'] == 'Integration Tester'
+            assert approved_resource['annotation_contributor']['email'] == 'tester@example.com'
+            assert approved_resource['annotation_contributor']['schemaKey'] == 'AnnotationContributor'
+            
+            # Verify approval information
+            assert approved_resource['approval_contributor']['name'] == 'Test Moderator'
+            assert approved_resource['approval_contributor']['email'] == 'moderator@example.com'
+            assert approved_resource['approval_contributor']['schemaKey'] == 'AnnotationContributor'
+            
+            # Verify metadata fields exist
+            assert 'annotation_date' in approved_resource
+            assert 'approval_date' in approved_resource
+            assert '_submission_filename' in approved_resource
+            assert '_submission_status' in approved_resource
+            assert approved_resource['_submission_status'] == 'approved'
+            assert approved_resource['_submission_filename'] == submitted_filename
     
     def test_authentication_workflow(self, client, mock_auth_manager):
         """Test complete authentication workflow: register -> login -> access protected -> logout"""
