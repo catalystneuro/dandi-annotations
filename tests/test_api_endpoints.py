@@ -4,11 +4,7 @@ Unit tests for DANDI External Resources API endpoints
 
 import pytest
 import json
-import os
-import tempfile
-import shutil
-from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import yaml
 
 
@@ -54,8 +50,8 @@ class TestAPIEndpoints:
         approved_submission = {
             'dandiset_id': '000001',
             'annotation_contributor': {
-                'name': 'Paul',
-                'email': 'paul.wesley.adkisson@gmail.com',
+                'name': 'Moderator One',
+                'email': 'moderator1@example.com',
                 'schemaKey': 'AnnotationContributor',
                 'identifier': 'https://orcid.org/0009-0005-8943-5450'
             },
@@ -81,8 +77,8 @@ class TestAPIEndpoints:
         community_submission_1 = {
             'dandiset_id': '000001',
             'annotation_contributor': {
-                'name': 'Dr. Sarah Chen',
-                'email': 's.chen@neuroscience.edu',
+                'name': 'newuser',
+                'email': 'newuser@example.com',
                 'schemaKey': 'AnnotationContributor',
                 'identifier': 'https://orcid.org/0000-0002-1234-5678'
             },
@@ -99,8 +95,8 @@ class TestAPIEndpoints:
         community_submission_2 = {
             'dandiset_id': '000001',
             'annotation_contributor': {
-                'name': 'Prof. Michael Rodriguez',
-                'email': 'm.rodriguez@brainlab.org',
+                'name': 'Moderator One',
+                'email': 'moderator1@example.com',
                 'schemaKey': 'AnnotationContributor',
                 'identifier': 'https://orcid.org/0000-0003-2345-6789'
             },
@@ -117,8 +113,8 @@ class TestAPIEndpoints:
         community_submission_3 = {
             'dandiset_id': '000001',
             'annotation_contributor': {
-                'name': 'Dr. Emily Watson',
-                'email': 'e.watson@computational.bio',
+                'name': 'newuser',
+                'email': 'newuser@example.com',
                 'schemaKey': 'AnnotationContributor',
                 'identifier': 'https://orcid.org/0000-0004-3456-7890'
             },
@@ -695,7 +691,7 @@ class TestAPIEndpoints:
             assert data['data']['total_pending_resources'] == 3
             assert data['data']['dandisets_with_resources'] == 1
             assert data['data']['total_resources'] == 4
-            assert data['data']['unique_contributors'] == 3
+            assert data['data']['unique_contributors'] == 2
             assert data['message'] == 'Overview statistics retrieved successfully'
     
     def test_api_stats_dandiset(self, client, mock_submission_handler):
@@ -713,7 +709,7 @@ class TestAPIEndpoints:
             assert data['data']['approved_count'] == 1
             assert data['data']['pending_count'] == 3
             assert data['data']['total_count'] == 4
-            assert data['data']['unique_contributors'] == 4
+            assert data['data']['unique_contributors'] == 2
             assert 'repositories' in data['data']
             assert data['data']['repositories'] == {
                 'Example URLs': 1,
@@ -916,63 +912,142 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'NOT_FOUND'
             assert data['error']['message'] == 'Submission not found'
     
-    # def test_api_user_submissions_own(self, client, mock_submission_handler, mock_auth_manager):
-    #     """Test GET /api/submissions/user/{user_email} for own submissions"""
-    #     login_data = {
-    #         'username': 'moderator1',
-    #         'password': 'mod123'
-    #     }
-    #     with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
-    #          patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-    #         client.post(
-    #             '/api/auth/login',
-    #             data=json.dumps(login_data),
-    #             content_type='application/json'
-    #         )
-    #         response = client.get('/api/submissions/user/moderator1@example.com')
+    def test_api_user_submissions_own_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test GET /api/submissions/user/{user_email} for own submissions"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.get('/api/submissions/user/moderator1@example.com')
 
-    #         assert response.status_code == 200
-    #         data = json.loads(response.data)
+            assert response.status_code == 200
+            data = json.loads(response.data)
 
-    #         print(data)
-            
-    #         assert data['success'] is True
-    #         assert 'community_submissions' in data['data']
-    #         assert 'approved_submissions' in data['data']
+            assert data['success'] is True
+            assert 'community_submissions' in data['data']
+            assert 'approved_submissions' in data['data']
+            assert len(data['data']['community_submissions']) == 1
+            assert len(data['data']['approved_submissions']) == 1
+            assert data['data']['community_submissions'][0]['name'] == 'Electrophysiology Data Analysis Methods'
+            assert data['data']['community_submissions'][0]['annotation_contributor']['email'] == 'moderator1@example.com'
+            assert data['data']['approved_submissions'][0]['name'] == 'Example Resource'
+            assert data['data']['approved_submissions'][0]['annotation_contributor']['email'] == 'moderator1@example.com'
+            assert 'community_pagination' in data['data']
+            assert 'approved_pagination' in data['data']
+            assert data['data']['community_pagination']['total_items'] == 1
+            assert data['data']['approved_pagination']['total_items'] == 1
+            assert data['message'] == 'User submissions retrieved successfully'
+
+    def test_api_user_submissions_own_user(self, client, mock_submission_handler, mock_auth_manager):
+        """Test GET /api/submissions/user/{user_email} for own submissions as user"""
+        login_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.get('/api/submissions/user/newuser@example.com')
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'community_submissions' in data['data']
+            assert 'approved_submissions' in data['data']
+            assert len(data['data']['community_submissions']) == 2
+            assert len(data['data']['approved_submissions']) == 0
+            assert data['data']['community_submissions'][0]['name'] == 'Spike Sorting Algorithm Comparison Dataset'
+            assert data['data']['community_submissions'][0]['annotation_contributor']['email'] == 'newuser@example.com'
+            assert data['data']['community_submissions'][1]['name'] == 'Neural Signal Processing Toolkit'
+            assert data['data']['community_submissions'][1]['annotation_contributor']['email'] == 'newuser@example.com'
+            assert 'community_pagination' in data['data']
+            assert 'approved_pagination' in data['data']
+            assert data['data']['community_pagination']['total_items'] == 2
+            assert data['data']['approved_pagination']['total_items'] == 0
+            assert data['message'] == 'User submissions retrieved successfully'
+
+    def test_api_user_submissions_other_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test GET /api/submissions/user/{user_email} for other user as moderator"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.get('/api/submissions/user/newuser@example.com')
+
+            assert response.status_code == 403
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'FORBIDDEN'
+            assert data['error']['message'] == 'You can only view your own submissions'
+
+    def test_api_user_submissions_other_user(self, client, mock_submission_handler, mock_auth_manager):
+        """Test GET /api/submissions/user/{user_email} for other user as user"""
+        login_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.get('/api/submissions/user/moderator1@example.com')
+
+            assert response.status_code == 403
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'FORBIDDEN'
+            assert data['error']['message'] == 'You can only view your own submissions'
     
-#     def test_api_user_submissions_other_non_moderator(self, client, mock_auth_manager):
-#         """Test GET /api/submissions/user/{user_email} for other user as non-moderator"""
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.is_moderator.return_value = False
-            
-#             response = client.get('/api/submissions/user/other@example.com')
-            
-#             assert response.status_code == 403
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is False
-#             assert 'error' in data
+    def test_api_404_error(self, client):
+        """Test 404 error handling for API routes"""
+        response = client.get('/api/nonexistent')
+        
+        assert response.status_code == 404
+        data = json.loads(response.data)
+
+        assert data['success'] is False
+        assert 'error' in data
+        assert data['error']['code'] == 'NOT_FOUND'
+        assert data['error']['message'] == 'API endpoint not found'
     
-#     def test_api_404_error(self, client):
-#         """Test 404 error handling for API routes"""
-#         response = client.get('/api/nonexistent')
+    def test_api_405_error(self, client):
+        """Test 405 error handling for API routes"""
+        response = client.put('/api/dandisets')  # PUT not allowed
         
-#         assert response.status_code == 404
-#         data = json.loads(response.data)
+        assert response.status_code == 405
+        data = json.loads(response.data)
         
-#         assert data['success'] is False
-#         assert 'error' in data
-    
-#     def test_api_405_error(self, client):
-#         """Test 405 error handling for API routes"""
-#         response = client.put('/api/dandisets')  # PUT not allowed
-        
-#         assert response.status_code == 405
-#         data = json.loads(response.data)
-        
-#         assert data['success'] is False
-#         assert 'error' in data
+        assert data['success'] is False
+        assert 'error' in data
+        assert data['error']['code'] == 'METHOD_NOT_ALLOWED'
+        assert data['error']['message'] == 'Method not allowed'
 
 
-# if __name__ == '__main__':
-#     pytest.main([__file__])
+if __name__ == '__main__':
+    pytest.main([__file__])

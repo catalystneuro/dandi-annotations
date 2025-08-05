@@ -213,4 +213,4 @@ __marimo__/
 related_resource_dandi_page.png
 src/dandiannotations/external_resources
 src/dandiannotations/submissions
-flask_session
+flask_session/
