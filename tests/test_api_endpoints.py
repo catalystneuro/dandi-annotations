@@ -152,9 +152,34 @@ class TestAPIEndpoints:
         return submission_handler
 
     @pytest.fixture
-    def mock_auth_manager(self):
+    def mock_auth_manager(self, tmp_path):
         """Mock authentication manager"""
-        config_path = "/Users/pauladkisson/Documents/CatalystNeuro/DANDI/dandi-annotations/src/dandiannotations/webapp/config/moderators.yaml"
+        moderators_data = {
+            'moderators': {
+                'moderator1': {
+                    'username': 'moderator1',
+                    'password_hash': '$2b$12$koa/SpEe/k6Y6RU1ejCEpu/Pls94i2uQg69tWAgZnArQvE4iaX87u',  # password: mod123
+                    'name': 'Moderator One',
+                    'email': 'moderator1@example.com'
+                }
+            }
+        }
+        config_path = tmp_path / "moderators.yaml"
+        with open(config_path, 'w') as f:
+            yaml.dump(moderators_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False, indent=2)
+
+        users_data = {
+            'users': {
+                'newuser@example.com': {
+                    'password_hash': '$2b$12$NycLu.n9og.a5jUH51DThO2Wm95cgTBOuXd8vU6XCMTpyH8uzhite',
+                    'name': 'newuser',
+                    'registration_date': '2025-08-04T14:50:50.901882'
+                }
+            }
+        }
+        users_config_path = tmp_path / "users.yaml"
+        with open(users_config_path, 'w') as f:
+            yaml.dump(users_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False, indent=2)
         auth = AuthManager(config_path=config_path)
         return auth
     
@@ -397,7 +422,7 @@ class TestAPIEndpoints:
         
         assert response.status_code == 400
         data = json.loads(response.data)
-        
+
         assert data['success'] is False
         assert 'error' in data
         assert data['error']['code'] == 'VALIDATION_ERROR'
@@ -407,306 +432,513 @@ class TestAPIEndpoints:
         assert data['error']['details']['general'] == 'Content-Type must be application/json'
 
     
-#     def test_api_auth_login_valid(self, client, mock_auth_manager):
-#         """Test POST /api/auth/login with valid credentials"""
-#         test_data = {
-#             'username': 'test@example.com',
-#             'password': 'password123'
-#         }
+    def test_api_auth_login_moderator(self, client, mock_auth_manager):
+        """Test POST /api/auth/login with valid moderator credentials"""
+        test_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            
+            response = client.post('/api/auth/login',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['username'] == 'moderator1'
+            assert data['data']['email'] == 'moderator1@example.com'
+            assert data['data']['name'] == 'Moderator One'
+            assert data['data']['user_type'] == 'moderator'
+            assert data['message'] == 'Login successful'
+
+    def test_api_auth_login_user(self, client, mock_auth_manager):
+        """Test POST /api/auth/login with valid user credentials"""
+        test_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.post('/api/auth/login',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['username'] == 'newuser@example.com'
+            assert data['data']['email'] == 'newuser@example.com'
+            assert data['data']['name'] == 'newuser'
+            assert data['data']['user_type'] == 'user'
+            assert data['message'] == 'Login successful'
+    
+    def test_api_auth_login_invalid(self, client, mock_auth_manager):
+        """Test POST /api/auth/login with invalid credentials"""
+        test_data = {
+            'username': 'test@example.com',
+            'password': 'wrongpassword'
+        }
         
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.verify_credentials.return_value = {
-#                 'name': 'Test User',
-#                 'email': 'test@example.com',
-#                 'user_type': 'moderator'
-#             }
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.post('/api/auth/login',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
             
-#             response = client.post('/api/auth/login',
-#                                  data=json.dumps(test_data),
-#                                  content_type='application/json')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert data['data']['email'] == 'test@example.com'
+            assert response.status_code == 401
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'INVALID_CREDENTIALS'
+            assert data['error']['message'] == 'Invalid username or password'
     
-#     def test_api_auth_login_invalid(self, client, mock_auth_manager):
-#         """Test POST /api/auth/login with invalid credentials"""
-#         test_data = {
-#             'username': 'test@example.com',
-#             'password': 'wrongpassword'
-#         }
+    def test_api_auth_login_missing_fields(self, client):
+        """Test POST /api/auth/login with missing fields"""
+        test_data = {
+            'username': 'test@example.com'
+            # Missing password
+        }
         
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.verify_credentials.return_value = None
-            
-#             response = client.post('/api/auth/login',
-#                                  data=json.dumps(test_data),
-#                                  content_type='application/json')
-            
-#             assert response.status_code == 401
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is False
-#             assert 'error' in data
-    
-#     def test_api_auth_login_missing_fields(self, client):
-#         """Test POST /api/auth/login with missing fields"""
-#         test_data = {
-#             'username': 'test@example.com'
-#             # Missing password
-#         }
+        response = client.post('/api/auth/login',
+                             data=json.dumps(test_data),
+                             content_type='application/json')
         
-#         response = client.post('/api/auth/login',
-#                              data=json.dumps(test_data),
-#                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
         
-#         assert response.status_code == 400
-#         data = json.loads(response.data)
+        assert data['success'] is False
+        assert 'error' in data
+        assert data['error']['code'] == 'VALIDATION_ERROR'
+        assert data['error']['message'] == 'Validation failed'
+        assert 'details' in data['error']
+        assert 'general' in data['error']['details']
+        assert data['error']['details']['general'] == 'Username and password are required'
+    
+    def test_api_auth_register_valid(self, client, mock_auth_manager):
+        """Test POST /api/auth/register with valid data"""
+        test_data = {
+            'email': 'testuser@example.com',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        }
         
-#         assert data['success'] is False
-#         assert 'error' in data
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.post('/api/auth/register',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
+            
+            assert response.status_code == 201
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert data['data']['email'] == 'testuser@example.com'
+            assert data['data']['name'] == 'testuser'
+            assert data['data']['user_type'] == 'user'
+            assert data['data']['username'] == 'testuser@example.com'
+            assert data['message'] == 'Registration successful'
+
     
-#     def test_api_auth_register_valid(self, client, mock_auth_manager):
-#         """Test POST /api/auth/register with valid data"""
-#         test_data = {
-#             'email': 'newuser@example.com',
-#             'password': 'password123',
-#             'confirm_password': 'password123'
-#         }
+    def test_api_auth_register_email_exists(self, client, mock_auth_manager):
+        """Test POST /api/auth/register with existing email"""
+        test_data = {
+            'email': 'newuser@example.com',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        }
         
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.register_user.return_value = True
-#             mock_auth_manager.verify_credentials.return_value = {
-#                 'name': 'New User',
-#                 'email': 'newuser@example.com',
-#                 'user_type': 'user'
-#             }
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.post('/api/auth/register',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
             
-#             response = client.post('/api/auth/register',
-#                                  data=json.dumps(test_data),
-#                                  content_type='application/json')
-            
-#             assert response.status_code == 201
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert data['data']['email'] == 'newuser@example.com'
+            assert response.status_code == 409
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'EMAIL_EXISTS'
+            assert data['error']['message'] == 'Email already exists'
     
-#     def test_api_auth_register_email_exists(self, client, mock_auth_manager):
-#         """Test POST /api/auth/register with existing email"""
-#         test_data = {
-#             'email': 'existing@example.com',
-#             'password': 'password123',
-#             'confirm_password': 'password123'
-#         }
+    def test_api_auth_register_password_mismatch(self, client):
+        """Test POST /api/auth/register with password mismatch"""
+        test_data = {
+            'email': 'testuser@example.com',
+            'password': 'password123',
+            'confirm_password': 'different_password'
+        }
         
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.register_user.return_value = False
-            
-#             response = client.post('/api/auth/register',
-#                                  data=json.dumps(test_data),
-#                                  content_type='application/json')
-            
-#             assert response.status_code == 409
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is False
-#             assert 'error' in data
-    
-#     def test_api_auth_register_password_mismatch(self, client):
-#         """Test POST /api/auth/register with password mismatch"""
-#         test_data = {
-#             'email': 'newuser@example.com',
-#             'password': 'password123',
-#             'confirm_password': 'different_password'
-#         }
+        response = client.post('/api/auth/register',
+                             data=json.dumps(test_data),
+                             content_type='application/json')
         
-#         response = client.post('/api/auth/register',
-#                              data=json.dumps(test_data),
-#                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+
+        assert data['success'] is False
+        assert 'error' in data
+        assert data['error']['code'] == 'VALIDATION_ERROR'
+        assert data['error']['message'] == 'Validation failed'
+        assert 'details' in data['error']
+        assert 'general' in data['error']['details']
+        assert data['error']['details']['general'] == 'Passwords do not match'
+    
+    def test_api_auth_me_authenticated(self, client, mock_auth_manager):
+        """Test GET /api/auth/me when authenticated"""
+        test_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(test_data),
+                content_type='application/json'
+            )
+            response = client.get('/api/auth/me')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert data['data']['email'] == 'moderator1@example.com'
+            assert data['data']['is_moderator'] is True
+            assert data['data']['name'] == 'Moderator One'
+            assert data['data']['user_type'] == 'moderator'
+            assert data['message'] == 'User information retrieved successfully'
+    
+    def test_api_auth_me_unauthenticated(self, client, mock_auth_manager):
+        """Test GET /api/auth/me when not authenticated"""
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.get('/api/auth/me')
+            
+            assert response.status_code == 401
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'UNAUTHORIZED'
+            assert data['error']['message'] == 'Authentication required'
+    
+    def test_api_auth_logout_moderator(self, client, mock_auth_manager):
+        """Test POST /api/auth/logout"""
+        test_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(test_data),
+                content_type='application/json'
+            )
+            response = client.post('/api/auth/logout')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+            
+            assert data['success'] is True
+            assert data['data'] is None
+            assert data['message'] == 'Logout successful for Moderator One'
+    
+    def test_api_auth_logout_user(self, client, mock_auth_manager):
+        """Test POST /api/auth/logout for user"""
+        test_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(test_data),
+                content_type='application/json'
+            )
+            response = client.post('/api/auth/logout')
+
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert data['data'] is None
+            assert data['message'] == 'Logout successful for newuser'
+    
+    def test_api_auth_logout_unauthenticated(self, client, mock_auth_manager):
+        """Test POST /api/auth/logout when not authenticated"""
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.post('/api/auth/logout')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert data['data'] is None
+            assert data['message'] == 'Logout successful'
+
+    def test_api_stats_overview(self, client, mock_submission_handler):
+        """Test GET /api/stats/overview"""
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+            response = client.get('/api/stats/overview')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['total_dandisets'] == 1
+            assert data['data']['total_approved_resources'] == 1
+            assert data['data']['total_pending_resources'] == 3
+            assert data['data']['dandisets_with_resources'] == 1
+            assert data['data']['total_resources'] == 4
+            assert data['data']['unique_contributors'] == 3
+            assert data['message'] == 'Overview statistics retrieved successfully'
+    
+    def test_api_stats_dandiset(self, client, mock_submission_handler):
+        """Test GET /api/stats/dandisets/{dandiset_id}"""
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+            response = client.get('/api/stats/dandisets/dandiset_000001')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['dandiset_id'] == 'dandiset_000001'
+            assert data['data']['display_id'] == 'DANDI:000001'
+            assert data['data']['approved_count'] == 1
+            assert data['data']['pending_count'] == 3
+            assert data['data']['total_count'] == 4
+            assert data['data']['unique_contributors'] == 4
+            assert 'repositories' in data['data']
+            assert data['data']['repositories'] == {
+                'Example URLs': 1,
+                'GitHub': 1,
+                'Nature Neuroscience': 1,
+                'Zenodo': 1
+            }
+            assert 'resource_types' in data['data']
+            assert data['data']['resource_types'] == {
+                'dcite:BookChapter': 1,
+                'dcite:Dataset': 1,
+                'dcite:JournalArticle': 1,
+                'dcite:Software': 1
+            }
+            assert data['message'] == 'Dandiset statistics retrieved successfully'
+    
+    def test_api_pending_submissions_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test GET /api/submissions/pending as moderator"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+
+            response = client.get('/api/submissions/pending')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert response.status_code == 200
+            assert data['success'] is True
+            assert 'data' in data
+            assert len(data['data']) == 3  # 3 pending submissions
+            assert data['data'][0]['name'] == 'Spike Sorting Algorithm Comparison Dataset'
+            assert data['data'][1]['name'] == 'Electrophysiology Data Analysis Methods'
+            assert data['data'][2]['name'] == 'Neural Signal Processing Toolkit'
+            assert data['pagination']['total_items'] == 3
+            assert data['pagination']['total_pages'] == 1
+            assert data['message'] == 'Pending submissions retrieved successfully'
+    
+    def test_api_pending_submissions_non_moderator(self, client, mock_auth_manager):
+        """Test GET /api/submissions/pending as non-moderator"""
+        login_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.get('/api/submissions/pending')
+            
+            assert response.status_code == 403
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'FORBIDDEN'
+            assert data['error']['message'] == 'Moderator privileges required'
+    
+    def test_api_pending_submissions_unauthenticated(self, client, mock_auth_manager):
+        """Test GET /api/submissions/pending when unauthenticated"""
+        with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.get('/api/submissions/pending')
+            
+            assert response.status_code == 401
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'UNAUTHORIZED'
+            assert data['error']['message'] == 'Authentication required'
+    
+    def test_api_approve_submission_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test POST /api/submissions/{dandiset_id}/{filename}/approve as moderator"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.post('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/approve',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['_submission_status'] == 'approved'
+            assert data['data']['_submission_filename'] == '20241201_093000_submission.yaml'
+            assert data['data']['approval_contributor']['name'] == 'Moderator One'
+            assert data['data']['approval_contributor']['email'] == 'moderator1@example.com'
+            assert data['data']['approval_contributor']['schemaKey'] == 'AnnotationContributor'
+            assert data['data']['name'] == 'Neural Signal Processing Toolkit'
+            assert data['data']['url'] == 'https://github.com/neurosci-lab/neural-signal-toolkit'
+            assert data['data']['repository'] == 'GitHub'
+            assert data['data']['relation'] == 'dcite:IsSupplementTo'
+            assert data['data']['resourceType'] == 'dcite:Software'
+            assert data['data']['dandiset_id'] == 'dandiset_000001'
+            assert data['message'] == 'Submission approved successfully'
+
+    def test_api_approve_submission_invalid_user(self, client, mock_submission_handler, mock_auth_manager):
+        """Test POST /api/submissions/{dandiset_id}/{filename}/approve with invalid user credentials"""
+        login_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.post('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/approve',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
+            
+            assert response.status_code == 403
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'FORBIDDEN'
+            assert data['error']['message'] == 'Moderator privileges required'
+    
+    def test_api_approve_submission_unathenticated(self, client, mock_submission_handler, mock_auth_manager):
+        """Test POST /api/submissions/{dandiset_id}/{filename}/approve when unauthenticated"""
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.post('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/approve',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
+            
+            assert response.status_code == 401
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'UNAUTHORIZED'
+            assert data['error']['message'] == 'Authentication required'
+    
+    def test_api_approve_submission_not_found(self, client, mock_submission_handler, mock_auth_manager):
+        """Test POST /api/submissions/{dandiset_id}/{filename}/approve for non-existent submission"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
         
-#         assert response.status_code == 400
-#         data = json.loads(response.data)
-        
-#         assert data['success'] is False
-#         assert 'error' in data
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.post('/api/submissions/dandiset_000001/nonexistent.yaml/approve',
+                                 data=json.dumps(test_data),
+                                 content_type='application/json')
+            
+            assert response.status_code == 404
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'NOT_FOUND'
+            assert data['error']['message'] == 'Submission not found'
     
-#     def test_api_auth_me_authenticated(self, client, mock_auth_manager):
-#         """Test GET /api/auth/me when authenticated"""
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             response = client.get('/api/auth/me')
+    # def test_api_user_submissions_own(self, client, mock_submission_handler, mock_auth_manager):
+    #     """Test GET /api/submissions/user/{user_email} for own submissions"""
+    #     login_data = {
+    #         'username': 'moderator1',
+    #         'password': 'mod123'
+    #     }
+    #     with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+    #          patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+    #         client.post(
+    #             '/api/auth/login',
+    #             data=json.dumps(login_data),
+    #             content_type='application/json'
+    #         )
+    #         response = client.get('/api/submissions/user/moderator1@example.com')
+
+    #         assert response.status_code == 200
+    #         data = json.loads(response.data)
+
+    #         print(data)
             
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert data['data']['email'] == 'test@example.com'
-#             assert data['data']['is_moderator'] is True
-    
-#     def test_api_auth_me_unauthenticated(self, client, mock_auth_manager):
-#         """Test GET /api/auth/me when not authenticated"""
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.is_authenticated.return_value = False
-            
-#             response = client.get('/api/auth/me')
-            
-#             assert response.status_code == 401
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is False
-#             assert 'error' in data
-    
-#     def test_api_auth_logout(self, client, mock_auth_manager):
-#         """Test POST /api/auth/logout"""
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             response = client.post('/api/auth/logout')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             mock_auth_manager.logout_user.assert_called_once()
-    
-#     def test_api_stats_overview(self, client, mock_submission_handler):
-#         """Test GET /api/stats/overview"""
-#         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
-#             mock_submission_handler.get_all_pending_submissions.return_value = [
-#                 {'annotation_contributor': {'name': 'User 1'}},
-#                 {'annotation_contributor': {'name': 'User 2'}},
-#                 {'annotation_contributor': {'name': 'User 1'}}  # Duplicate
-#             ]
-            
-#             response = client.get('/api/stats/overview')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert 'data' in data
-#             assert data['data']['total_dandisets'] == 2
-#             assert data['data']['total_approved_resources'] == 2
-#             assert data['data']['total_pending_resources'] == 4
-    
-#     def test_api_stats_dandiset(self, client, mock_submission_handler):
-#         """Test GET /api/stats/dandisets/{dandiset_id}"""
-#         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
-#             mock_submission_handler.get_approved_submissions.return_value = [
-#                 {'resourceType': 'Software', 'repository': 'GitHub'},
-#                 {'resourceType': 'Dataset', 'repository': 'Zenodo'}
-#             ]
-#             mock_submission_handler.get_community_submissions.return_value = [
-#                 {'resourceType': 'Software', 'repository': 'GitHub'}
-#             ]
-            
-#             response = client.get('/api/stats/dandisets/dandiset_000001')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert data['data']['dandiset_id'] == 'dandiset_000001'
-#             assert data['data']['approved_count'] == 2
-#             assert data['data']['pending_count'] == 1
-    
-#     def test_api_pending_submissions_moderator(self, client, mock_submission_handler, mock_auth_manager):
-#         """Test GET /api/submissions/pending as moderator"""
-#         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
-#              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-            
-#             mock_submission_handler.get_all_pending_submissions_paginated.return_value = (
-#                 [{'name': 'Test Resource'}],
-#                 {'page': 1, 'total_items': 1, 'total_pages': 1}
-#             )
-            
-#             response = client.get('/api/submissions/pending')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert len(data['data']) == 1
-    
-#     def test_api_pending_submissions_non_moderator(self, client, mock_auth_manager):
-#         """Test GET /api/submissions/pending as non-moderator"""
-#         with patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-#             mock_auth_manager.is_moderator.return_value = False
-            
-#             response = client.get('/api/submissions/pending')
-            
-#             assert response.status_code == 403
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is False
-#             assert 'error' in data
-    
-#     def test_api_approve_submission_moderator(self, client, mock_submission_handler, mock_auth_manager):
-#         """Test POST /api/submissions/{dandiset_id}/{filename}/approve as moderator"""
-#         test_data = {
-#             'moderator_name': 'Test Moderator',
-#             'moderator_email': 'moderator@example.com'
-#         }
-        
-#         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
-#              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-            
-#             mock_submission_handler.get_submission_by_filename.return_value = {
-#                 'name': 'Test Resource'
-#             }
-#             mock_submission_handler.approve_submission.return_value = True
-            
-#             response = client.post('/api/submissions/dandiset_000001/test.yaml/approve',
-#                                  data=json.dumps(test_data),
-#                                  content_type='application/json')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-    
-#     def test_api_approve_submission_not_found(self, client, mock_submission_handler, mock_auth_manager):
-#         """Test POST /api/submissions/{dandiset_id}/{filename}/approve for non-existent submission"""
-#         test_data = {
-#             'moderator_name': 'Test Moderator',
-#             'moderator_email': 'moderator@example.com'
-#         }
-        
-#         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
-#              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-            
-#             mock_submission_handler.get_submission_by_filename.return_value = None
-            
-#             response = client.post('/api/submissions/dandiset_000001/nonexistent.yaml/approve',
-#                                  data=json.dumps(test_data),
-#                                  content_type='application/json')
-            
-#             assert response.status_code == 404
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is False
-#             assert 'error' in data
-    
-#     def test_api_user_submissions_own(self, client, mock_submission_handler, mock_auth_manager):
-#         """Test GET /api/submissions/user/{user_email} for own submissions"""
-#         with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
-#              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
-            
-#             mock_submission_handler.get_user_submissions_paginated.return_value = (
-#                 [{'name': 'Community Resource'}],  # community
-#                 {'page': 1, 'total_items': 1},     # community pagination
-#                 [{'name': 'Approved Resource'}],   # approved
-#                 {'page': 1, 'total_items': 1}      # approved pagination
-#             )
-            
-#             response = client.get('/api/submissions/user/test@example.com')
-            
-#             assert response.status_code == 200
-#             data = json.loads(response.data)
-            
-#             assert data['success'] is True
-#             assert 'community_submissions' in data['data']
-#             assert 'approved_submissions' in data['data']
+    #         assert data['success'] is True
+    #         assert 'community_submissions' in data['data']
+    #         assert 'approved_submissions' in data['data']
     
 #     def test_api_user_submissions_other_non_moderator(self, client, mock_auth_manager):
 #         """Test GET /api/submissions/user/{user_email} for other user as non-moderator"""
