@@ -17,7 +17,7 @@
                         <a href="{{ url_for('submit_form') }}" class="btn btn-light btn-lg">
                             <i class="fas fa-plus"></i> Submit New Resource
                         </a>
-                        {% if is_authenticated %}
+                        {% if is_authenticated and is_moderator %}
                         <a href="{{ url_for('moderate') }}" class="btn btn-outline-light btn-lg">
                             <i class="fas fa-gavel"></i> Moderate Submissions
                         </a>
@@ -37,6 +37,7 @@
                         </div>
                     </div>
                 </div>
+                {% if show_community_stats %}
                 <div class="col-md-3">
                     <div class="card bg-warning text-dark text-center">
                         <div class="card-body">
@@ -46,6 +47,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
                 <div class="col-md-3">
                     <div class="card bg-info text-white text-center">
                         <div class="card-body">
@@ -59,8 +61,8 @@
                     <div class="card bg-secondary text-white text-center">
                         <div class="card-body">
                             <i class="fas fa-link fa-2x mb-2"></i>
-                            <h3>{{ total_approved + total_community }}</h3>
-                            <p class="mb-0">Total Resources</p>
+                            <h3>{% if show_community_stats %}{{ total_approved + total_community }}{% else %}{{ total_approved }}{% endif %}</h3>
+                            <p class="mb-0">{% if show_community_stats %}Total Resources{% else %}Total Resources{% endif %}</p>
                         </div>
                     </div>
                 </div>

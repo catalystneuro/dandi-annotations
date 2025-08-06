@@ -101,6 +101,10 @@
                                            class="btn btn-success w-100">
                                             <i class="fas fa-check"></i> Approve Submission
                                         </a>
+                                        <button type="button" class="btn btn-danger w-100" 
+                                                onclick="confirmDelete('{{ resource._dandiset_id }}', '{{ resource._submission_filename }}', 'community')">
+                                            <i class="fas fa-trash"></i> Delete Submission
+                                        </button>
                                         <a href="{{ url_for('dandiset_resources', dandiset_id=resource._dandiset_id) }}" 
                                            class="btn btn-outline-primary btn-sm">
                                             <i class="fas fa-eye"></i> View DANDI Set Resources

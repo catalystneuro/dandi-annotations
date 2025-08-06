@@ -106,6 +106,16 @@
                                         {% endif %}
                                         {% endif %}
                                     </small>
+                                    
+                                    {% if is_authenticated and is_moderator %}
+                                    <!-- Moderator Actions -->
+                                    <div class="mt-3 d-grid">
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="confirmDelete('{{ dandiset_id }}', '{{ resource._submission_filename }}', 'approved')">
+                                            <i class="fas fa-trash"></i> Delete Resource
+                                        </button>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -119,7 +129,8 @@
                 {% endif %}
             </div>
 
-            <!-- Community Submissions Section -->
+            <!-- Community Submissions Section (Only visible to authenticated moderators) -->
+            {% if is_authenticated and is_moderator %}
             <div class="mb-5">
                 <h3 class="mb-3">
                     <i class="fas fa-clock text-warning"></i> 
@@ -206,13 +217,17 @@
                                         <strong>Submitted:</strong> {{ resource.annotation_date[:10] }}
                                     </small>
                                     
-                                    {% if is_authenticated %}
+                                    {% if is_authenticated and is_moderator %}
                                     <!-- Moderator Actions -->
-                                    <div class="mt-3 d-grid">
+                                    <div class="mt-3 d-grid gap-2">
                                         <a href="{{ url_for('approve_submission', dandiset_id=dandiset_id, filename=resource._submission_filename) }}" 
                                            class="btn btn-success btn-sm">
                                             <i class="fas fa-check"></i> Approve Submission
                                         </a>
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="confirmDelete('{{ dandiset_id }}', '{{ resource._submission_filename }}', 'community')">
+                                            <i class="fas fa-trash"></i> Delete Submission
+                                        </button>
                                     </div>
                                     {% endif %}
                                 </div>
@@ -227,6 +242,7 @@
                     </div>
                 {% endif %}
             </div>
+            {% endif %}
 
             <!-- Summary Stats -->
             <div class="row">

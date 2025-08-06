@@ -397,3 +397,136 @@ class SubmissionHandler:
         """
         all_submissions = self.get_all_pending_submissions()
         return self._paginate_list(all_submissions, page, per_page)
+    
+    def get_user_submissions(self, user_email: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """
+        Get all submissions (community and approved) for a specific user
+        
+        Args:
+            user_email: Email address of the user
+            
+        Returns:
+            Tuple of (community_submissions, approved_submissions)
+        """
+        try:
+            community_submissions = []
+            approved_submissions = []
+            
+            # Iterate through all dandiset directories
+            for dandiset_dir in self.base_dir.iterdir():
+                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                    dandiset_id = dandiset_dir.name
+                    
+                    # Get community submissions for this dandiset
+                    dandiset_community = self.get_community_submissions(dandiset_id)
+                    for submission in dandiset_community:
+                        contributor_email = submission.get('annotation_contributor', {}).get('email', '')
+                        if contributor_email == user_email:
+                            submission['_dandiset_id'] = dandiset_id
+                            community_submissions.append(submission)
+                    
+                    # Get approved submissions for this dandiset
+                    dandiset_approved = self.get_approved_submissions(dandiset_id)
+                    for submission in dandiset_approved:
+                        contributor_email = submission.get('annotation_contributor', {}).get('email', '')
+                        if contributor_email == user_email:
+                            submission['_dandiset_id'] = dandiset_id
+                            approved_submissions.append(submission)
+            
+            # Sort by annotation_date (newest first)
+            community_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            approved_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            
+            return community_submissions, approved_submissions
+            
+        except Exception as e:
+            raise Exception(f"Error loading user submissions: {str(e)}")
+    
+    def get_user_submissions_paginated(self, user_email: str, community_page: int = 1, approved_page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Get paginated submissions for a specific user
+        
+        Args:
+            user_email: Email address of the user
+            community_page: Current page for community submissions
+            approved_page: Current page for approved submissions
+            per_page: Number of submissions per page
+            
+        Returns:
+            Tuple of (community_submissions, community_pagination, approved_submissions, approved_pagination)
+        """
+        community_submissions, approved_submissions = self.get_user_submissions(user_email)
+        
+        community_paginated, community_pagination = self._paginate_list(community_submissions, community_page, per_page)
+        approved_paginated, approved_pagination = self._paginate_list(approved_submissions, approved_page, per_page)
+        
+        return community_paginated, community_pagination, approved_paginated, approved_pagination
+    
+    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
+        """
+        Delete a submission and move it to backup folder with audit trail
+        
+        Args:
+            dandiset_id: The dandiset identifier
+            filename: The submission filename to delete
+            status: 'community' or 'approved'
+            moderator_info: Information about the moderator performing deletion
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get source directory based on status
+            if status == 'community':
+                source_dir = self._get_community_dir(dandiset_id)
+            elif status == 'approved':
+                source_dir = self._get_approved_dir(dandiset_id)
+            else:
+                raise ValueError(f"Invalid status: {status}. Must be 'community' or 'approved'")
+            
+            # Get source file path
+            source_path = source_dir / filename
+            
+            if not source_path.exists():
+                raise FileNotFoundError(f"Submission file not found: {filename}")
+            
+            # Create deleted directory structure
+            dandiset_dir = self._get_dandiset_dir(dandiset_id)
+            deleted_dir = dandiset_dir / "deleted" / status
+            deleted_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate timestamped filename for backup
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"deleted_{timestamp}_{filename}"
+            backup_path = deleted_dir / backup_filename
+            
+            # Load the existing submission data
+            with open(source_path, 'r', encoding='utf-8') as file:
+                submission_data = yaml.safe_load(file)
+            
+            # Add deletion metadata
+            submission_data['deletion_info'] = {
+                'deleted_by': {
+                    'name': moderator_info.get('name', 'Unknown Moderator'),
+                    'email': moderator_info.get('email'),
+                    'identifier': moderator_info.get('identifier'),
+                    'url': moderator_info.get('url'),
+                    'schemaKey': 'AnnotationContributor'
+                },
+                'deletion_date': datetime.now().astimezone().isoformat(),
+                'original_filename': filename,
+                'original_status': status
+            }
+            
+            # Save the updated data to the backup folder
+            with open(backup_path, 'w', encoding='utf-8') as file:
+                yaml.dump(submission_data, file, default_flow_style=False, 
+                         allow_unicode=True, sort_keys=False, indent=2)
+            
+            # Remove the original file
+            source_path.unlink()
+            
+            return True
+            
+        except Exception as e:
+            raise Exception(f"Error deleting submission: {str(e)}")

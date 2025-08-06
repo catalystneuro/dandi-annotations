@@ -1,0 +1,5 @@
+users:
+  paul.wesley.adkisson@gmail.com:
+    password_hash: $2b$12$AO9HlprW661cZyG8WeiTdu4xhkQ5US/loc32SULQZPPil3kElQSdG
+    name: paul.wesley.adkisson
+    registration_date: '2025-08-04T12:32:37.548972'
