@@ -252,6 +252,78 @@ Content-Type: application/json
 - `moderator_name`: Name of the moderator
 - `moderator_email`: Valid email address
 
+### Delete Submission
+```http
+DELETE /api/submissions/dandiset_000001/submission_file.yaml/delete?status=community
+Content-Type: application/json
+
+{
+  "moderator_name": "Moderator Name",
+  "moderator_email": "moderator@example.com",
+  "moderator_identifier": "https://orcid.org/0000-0000-0000-0000",
+  "moderator_url": "https://moderator.com"
+}
+```
+*Requires moderator privileges*
+
+**Required Fields:**
+- `moderator_name`: Name of the moderator
+- `moderator_email`: Valid email address
+
+**Query Parameters:**
+- `status`: Must be either "community" or "approved"
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "dandiset_id": "dandiset_000001",
+    "filename": "submission_file.yaml",
+    "status": "community",
+    "resource_name": "Resource Name",
+    "deleted_by": "Moderator Name",
+    "deletion_date": "2025-01-04T10:30:00.000Z"
+  },
+  "message": "Submission 'Resource Name' deleted successfully"
+}
+```
+
+### Delete Resource by ID
+```http
+DELETE /api/resources/resource_id_123
+Content-Type: application/json
+
+{
+  "moderator_name": "Moderator Name",
+  "moderator_email": "moderator@example.com",
+  "moderator_identifier": "https://orcid.org/0000-0000-0000-0000",
+  "moderator_url": "https://moderator.com"
+}
+```
+*Requires moderator privileges*
+
+**Required Fields:**
+- `moderator_name`: Name of the moderator
+- `moderator_email`: Valid email address
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "resource_id": "resource_id_123",
+    "dandiset_id": "dandiset_000001",
+    "filename": "submission_file.yaml",
+    "status": "community",
+    "resource_name": "Resource Name",
+    "deleted_by": "Moderator Name",
+    "deletion_date": "2025-01-04T10:30:00.000Z"
+  },
+  "message": "Resource 'Resource Name' deleted successfully"
+}
+```
+
 ### Get User Submissions
 ```http
 GET /api/submissions/user/user@example.com?community_page=1&approved_page=1&per_page=10

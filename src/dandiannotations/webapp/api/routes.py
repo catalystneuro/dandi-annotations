@@ -503,6 +503,182 @@ def approve_submission(dandiset_id, filename):
         return internal_error_response(f"Error approving submission: {str(e)}")
 
 
+@api_bp.route('/submissions/<dandiset_id>/<filename>/delete', methods=['DELETE'])
+def delete_submission(dandiset_id, filename):
+    """
+    DELETE /api/submissions/{dandiset_id}/{filename}/delete
+    Delete a submission (moderator only)
+    Query parameter: status (community or approved)
+    """
+    # Check moderator privileges
+    auth_error = auth_manager.require_moderator()
+    if auth_error:
+        if auth_error['status_code'] == 401:
+            return unauthorized_response(auth_error['error'])
+        else:
+            return forbidden_response(auth_error['error'])
+    
+    try:
+        # Get status from query parameter
+        status = request.args.get('status', '').strip().lower()
+        if status not in ['community', 'approved']:
+            return validation_error_response("Status parameter must be 'community' or 'approved'")
+        
+        # Validate content type
+        is_valid, error_msg = validate_content_type()
+        if not is_valid:
+            return validation_error_response(error_msg)
+        
+        # Validate JSON request
+        is_valid, error_msg = validate_json_request()
+        if not is_valid:
+            return validation_error_response(error_msg)
+        
+        # Validate dandiset ID
+        is_valid, error_msg = validate_dandiset_id(dandiset_id)
+        if not is_valid:
+            return validation_error_response(error_msg)
+        
+        # Get request data
+        data = request.get_json()
+        
+        # Validate moderator deletion data (reuse approval validation)
+        is_valid, error_msg, validation_details = validate_moderator_approval(data)
+        if not is_valid:
+            if validation_details:
+                return validation_error_response(validation_details)
+            else:
+                return validation_error_response(error_msg)
+        
+        # Prepare moderator info
+        moderator_info = {
+            'name': data['moderator_name'],
+            'email': data['moderator_email']
+        }
+        
+        if data.get('moderator_identifier'):
+            moderator_info['identifier'] = data['moderator_identifier']
+        
+        if data.get('moderator_url'):
+            moderator_info['url'] = data['moderator_url']
+        
+        # Get submission details before deletion
+        submission = submission_handler.get_submission_by_filename(dandiset_id, filename, status)
+        if not submission:
+            return not_found_response("Submission")
+        
+        # Store submission info for response
+        resource_name = submission.get('name', filename)
+        
+        # Delete the submission
+        success = submission_handler.delete_submission(dandiset_id, filename, status, moderator_info)
+        
+        if success:
+            return success_response(
+                data={
+                    'dandiset_id': dandiset_id,
+                    'filename': filename,
+                    'status': status,
+                    'resource_name': resource_name,
+                    'deleted_by': moderator_info['name'],
+                    'deletion_date': datetime.now().astimezone().isoformat()
+                },
+                message=f"Submission '{resource_name}' deleted successfully"
+            )
+        else:
+            return error_response("Failed to delete submission", "DELETION_FAILED", 500)
+        
+    except Exception as e:
+        return internal_error_response(f"Error deleting submission: {str(e)}")
+
+
+@api_bp.route('/resources/<resource_id>', methods=['DELETE'])
+def delete_resource_by_id(resource_id):
+    """
+    DELETE /api/resources/{resource_id}
+    Delete a resource by ID (moderator only)
+    """
+    # Check moderator privileges
+    auth_error = auth_manager.require_moderator()
+    if auth_error:
+        if auth_error['status_code'] == 401:
+            return unauthorized_response(auth_error['error'])
+        else:
+            return forbidden_response(auth_error['error'])
+    
+    try:
+        # Validate content type
+        is_valid, error_msg = validate_content_type()
+        if not is_valid:
+            return validation_error_response(error_msg)
+        
+        # Validate JSON request
+        is_valid, error_msg = validate_json_request()
+        if not is_valid:
+            return validation_error_response(error_msg)
+        
+        # Get request data
+        data = request.get_json()
+        
+        # Validate moderator deletion data
+        is_valid, error_msg, validation_details = validate_moderator_approval(data)
+        if not is_valid:
+            if validation_details:
+                return validation_error_response(validation_details)
+            else:
+                return validation_error_response(error_msg)
+        
+        # Find the resource
+        resource = submission_handler.get_resource_by_id(resource_id)
+        if not resource:
+            return not_found_response("Resource")
+        
+        # Extract dandiset_id, filename, and status from resource
+        dandiset_id = f"dandiset_{resource.get('dandiset_id')}"
+        filename = resource.get('_submission_filename')
+        status = resource.get('_submission_status')
+        
+        if not all([dandiset_id, filename, status]):
+            return error_response("Resource metadata incomplete", "INVALID_RESOURCE", 400)
+        
+        # Prepare moderator info
+        moderator_info = {
+            'name': data['moderator_name'],
+            'email': data['moderator_email']
+        }
+        
+        if data.get('moderator_identifier'):
+            moderator_info['identifier'] = data['moderator_identifier']
+        
+        if data.get('moderator_url'):
+            moderator_info['url'] = data['moderator_url']
+        
+        # Store resource info for response
+        resource_name = resource.get('name', filename)
+        
+        # Delete the submission
+        success = submission_handler.delete_submission(dandiset_id, filename, status, moderator_info)
+        
+        if success:
+            return success_response(
+                data={
+                    'resource_id': resource_id,
+                    'dandiset_id': dandiset_id,
+                    'filename': filename,
+                    'status': status,
+                    'resource_name': resource_name,
+                    'deleted_by': moderator_info['name'],
+                    'deletion_date': datetime.now().astimezone().isoformat()
+                },
+                message=f"Resource '{resource_name}' deleted successfully"
+            )
+        else:
+            return error_response("Failed to delete resource", "DELETION_FAILED", 500)
+        
+    except Exception as e:
+        return internal_error_response(f"Error deleting resource: {str(e)}")
+
+
 @api_bp.route('/submissions/user/<user_email>', methods=['GET'])
 def get_user_submissions(user_email):
     """

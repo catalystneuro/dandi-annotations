@@ -1048,6 +1048,433 @@ class TestAPIEndpoints:
         assert data['error']['code'] == 'METHOD_NOT_ALLOWED'
         assert data['error']['message'] == 'Method not allowed'
 
+    def test_api_delete_submission_moderator_community(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete for community submission as moderator"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete?status=community',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['dandiset_id'] == 'dandiset_000001'
+            assert data['data']['filename'] == '20241201_093000_submission.yaml'
+            assert data['data']['status'] == 'community'
+            assert data['data']['resource_name'] == 'Neural Signal Processing Toolkit'
+            assert data['data']['deleted_by'] == 'Moderator One'
+            assert 'deletion_date' in data['data']
+            assert data['message'] == "Submission 'Neural Signal Processing Toolkit' deleted successfully"
+
+    def test_api_delete_submission_moderator_approved(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete for approved submission as moderator"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/20250730_104159_submission.yaml/delete?status=approved',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['dandiset_id'] == 'dandiset_000001'
+            assert data['data']['filename'] == '20250730_104159_submission.yaml'
+            assert data['data']['status'] == 'approved'
+            assert data['data']['resource_name'] == 'Example Resource'
+            assert data['data']['deleted_by'] == 'Moderator One'
+            assert 'deletion_date' in data['data']
+            assert data['message'] == "Submission 'Example Resource' deleted successfully"
+
+    def test_api_delete_submission_missing_status(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete without status parameter"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'VALIDATION_ERROR'
+            assert data['error']['message'] == 'Validation failed'
+            assert 'details' in data['error']
+            assert 'general' in data['error']['details']
+            assert data['error']['details']['general'] == "Status parameter must be 'community' or 'approved'"
+
+    def test_api_delete_submission_invalid_status(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete with invalid status parameter"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete?status=invalid',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'VALIDATION_ERROR'
+            assert data['error']['message'] == 'Validation failed'
+            assert 'details' in data['error']
+            assert 'general' in data['error']['details']
+            assert data['error']['details']['general'] == "Status parameter must be 'community' or 'approved'"
+
+    def test_api_delete_submission_non_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete as non-moderator"""
+        login_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete?status=community',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 403
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'FORBIDDEN'
+            assert data['error']['message'] == 'Moderator privileges required'
+
+    def test_api_delete_submission_unauthenticated(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete when unauthenticated"""
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete?status=community',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 401
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'UNAUTHORIZED'
+            assert data['error']['message'] == 'Authentication required'
+
+    def test_api_delete_submission_not_found(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete for non-existent submission"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/nonexistent.yaml/delete?status=community',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 404
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'NOT_FOUND'
+            assert data['error']['message'] == 'Submission not found'
+
+    def test_api_delete_submission_missing_moderator_data(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete with missing moderator data"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One'
+            # Missing moderator_email
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete?status=community',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'VALIDATION_ERROR'
+            assert data['error']['message'] == 'Validation failed'
+
+    def test_api_delete_resource_by_id_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/resources/{resource_id} as moderator"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/resources/20241201_093000_submission',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 200
+            data = json.loads(response.data)
+
+            assert data['success'] is True
+            assert 'data' in data
+            assert data['data']['resource_id'] == '20241201_093000_submission'
+            assert data['data']['dandiset_id'] == 'dandiset_000001'
+            assert data['data']['filename'] == '20241201_093000_submission.yaml'
+            assert data['data']['status'] == 'community'
+            assert data['data']['resource_name'] == 'Neural Signal Processing Toolkit'
+            assert data['data']['deleted_by'] == 'Moderator One'
+            assert 'deletion_date' in data['data']
+            assert data['message'] == "Resource 'Neural Signal Processing Toolkit' deleted successfully"
+
+    def test_api_delete_resource_by_id_non_moderator(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/resources/{resource_id} as non-moderator"""
+        login_data = {
+            'username': 'newuser@example.com',
+            'password': 'password123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/resources/20241201_093000_submission',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 403
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'FORBIDDEN'
+            assert data['error']['message'] == 'Moderator privileges required'
+
+    def test_api_delete_resource_by_id_unauthenticated(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/resources/{resource_id} when unauthenticated"""
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            response = client.delete('/api/resources/20241201_093000_submission',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 401
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'UNAUTHORIZED'
+            assert data['error']['message'] == 'Authentication required'
+
+    def test_api_delete_resource_by_id_not_found(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/resources/{resource_id} for non-existent resource"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/resources/nonexistent_resource',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 404
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'NOT_FOUND'
+            assert data['error']['message'] == 'Resource not found'
+
+    def test_api_delete_resource_by_id_missing_moderator_data(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/resources/{resource_id} with missing moderator data"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One'
+            # Missing moderator_email
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/resources/20241201_093000_submission',
+                                   data=json.dumps(test_data),
+                                   content_type='application/json')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'VALIDATION_ERROR'
+            assert data['error']['message'] == 'Validation failed'
+
+    def test_api_delete_resource_by_id_wrong_content_type(self, client, mock_submission_handler, mock_auth_manager):
+        """Test DELETE /api/resources/{resource_id} with wrong content type"""
+        login_data = {
+            'username': 'moderator1',
+            'password': 'mod123'
+        }
+        test_data = {
+            'moderator_name': 'Moderator One',
+            'moderator_email': 'moderator1@example.com'
+        }
+
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+             patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
+            client.post(
+                '/api/auth/login',
+                data=json.dumps(login_data),
+                content_type='application/json'
+            )
+            response = client.delete('/api/resources/20241201_093000_submission',
+                                   data=json.dumps(test_data),
+                                   content_type='text/plain')
+            
+            assert response.status_code == 400
+            data = json.loads(response.data)
+
+            assert data['success'] is False
+            assert 'error' in data
+            assert data['error']['code'] == 'VALIDATION_ERROR'
+            assert data['error']['message'] == 'Validation failed'
+            assert 'details' in data['error']
+            assert 'general' in data['error']['details']
+            assert data['error']['details']['general'] == 'Content-Type must be application/json'
+
 
 if __name__ == '__main__':
     pytest.main([__file__])
