@@ -310,32 +310,29 @@ class ResourceService:
             return resources
         except Exception as e:
             raise ResourceNotFoundError(f"Failed to get dandiset resources: {str(e)}")
-    
-    def get_pending_resources(self, dandiset_id: Optional[str] = None) -> List[Resource]:
+
+    def get_pending_resources(self, dandiset_id: str) -> List[Resource]:
         """
-        Get pending resources, optionally filtered by dandiset.
+        Get pending resources for a dandiset.
         
         Args:
-            dandiset_id: Optional dandiset identifier to filter by
+            dandiset_id: The dandiset identifier
             
         Returns:
-            List of pending Resource objects
+            List of pending serialized Resource objects
         """
         try:
-            if dandiset_id:
-                pending_data = self.repository.list_resources(dandiset_id, ResourceStatus.PENDING)
-            else:
-                pending_data = self.repository.list_all_resources(ResourceStatus.PENDING)
-            
+            pending_data = self.repository.list_resources(dandiset_id, ResourceStatus.PENDING)
             resources = []
             for data in pending_data:
-                resources.append(self._create_resource_from_data(data))
-            
+                resource = self._create_resource_from_data(data)
+                resources.append(resource.serialize())
+
             return resources
         except Exception as e:
             raise ResourceNotFoundError(f"Failed to get pending resources: {str(e)}")
     
-    def get_approved_resources(self, dandiset_id: str) -> List[Resource]:
+    def get_approved_resources(self, dandiset_id: str) -> List[Dict[str, Any]]:
         """
         Get approved resources for a dandiset.
         
@@ -343,14 +340,15 @@ class ResourceService:
             dandiset_id: The dandiset identifier
             
         Returns:
-            List of approved Resource objects
+            List of approved serialized Resource objects
         """
         try:
             approved_data = self.repository.list_resources(dandiset_id, ResourceStatus.APPROVED)
             resources = []
             for data in approved_data:
-                resources.append(self._create_resource_from_data(data))
-            
+                resource = self._create_resource_from_data(data)
+                resources.append(resource.serialize())
+
             return resources
         except Exception as e:
             raise ResourceNotFoundError(f"Failed to get approved resources: {str(e)}")

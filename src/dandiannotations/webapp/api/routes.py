@@ -151,47 +151,42 @@ def get_dandiset_resources(dandiset_id):
 
 
 @api_bp.route('/dandisets/<dandiset_id>/resources/approved', methods=['GET'])
+@handle_api_errors("Error retrieving approved resources")
 def get_dandiset_approved_resources(dandiset_id):
     """
     GET /api/dandisets/{dandiset_id}/resources/approved
     Get approved resources for a specific dandiset
     """
-    try:
-        # Validate dandiset ID
-        is_valid, error_msg = validate_dandiset_id(dandiset_id)
-        if not is_valid:
-            return validation_error_response(error_msg)
-        
-        # Get pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        
-        # Validate pagination
-        is_valid, error_msg, validated_params = validate_pagination_params(page, per_page)
-        if not is_valid:
-            return validation_error_response(error_msg)
-        
-        # Get approved resources
-        approved_submissions, pagination_info = submission_handler.get_approved_submissions_paginated(
-            dandiset_id, validated_params['page'], validated_params['per_page']
-        )
-        
-        # Serialize data
-        serialized_resources = serialize_external_resources(approved_submissions)
-        
-        return paginated_response(
-            data=serialized_resources,
-            page=validated_params['page'],
-            per_page=validated_params['per_page'],
-            total_items=pagination_info['total_items'],
-            message="Approved resources retrieved successfully"
-        )
-        
-    except Exception as e:
-        return internal_error_response(f"Error retrieving approved resources: {str(e)}")
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    # Validate dandiset ID
+    is_valid, error_msg = validate_dandiset_id(dandiset_id)
+    if not is_valid:
+        return validation_error_response(error_msg)
+    
+    # Validate pagination
+    is_valid, error_msg = validate_pagination_params(page, per_page)
+    if not is_valid:
+        return validation_error_response(error_msg)
+    
+    # Get approved resources
+    data = resource_service.get_approved_resources(dandiset_id=dandiset_id)
+
+    # Get response
+    response = paginated_response(
+        data=data,
+        page=page,
+        per_page=per_page,
+        message="Approved resources retrieved successfully"
+    )
+
+    return response
 
 
 @api_bp.route('/dandisets/<dandiset_id>/resources/pending', methods=['GET'])
+@handle_api_errors("Error retrieving pending resources")
 def get_dandiset_pending_resources(dandiset_id):
     """
     GET /api/dandisets/{dandiset_id}/resources/pending
@@ -201,40 +196,33 @@ def get_dandiset_pending_resources(dandiset_id):
     auth_error = auth_manager.require_authentication()
     if auth_error:
         return unauthorized_response(auth_error['error'])
-    
-    try:
-        # Validate dandiset ID
-        is_valid, error_msg = validate_dandiset_id(dandiset_id)
-        if not is_valid:
-            return validation_error_response(error_msg)
-        
-        # Get pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        
-        # Validate pagination
-        is_valid, error_msg, validated_params = validate_pagination_params(page, per_page)
-        if not is_valid:
-            return validation_error_response(error_msg)
-        
-        # Get community (pending) resources
-        community_submissions, pagination_info = submission_handler.get_community_submissions_paginated(
-            dandiset_id, validated_params['page'], validated_params['per_page']
-        )
-        
-        # Serialize data
-        serialized_resources = serialize_external_resources(community_submissions)
-        
-        return paginated_response(
-            data=serialized_resources,
-            page=validated_params['page'],
-            per_page=validated_params['per_page'],
-            total_items=pagination_info['total_items'],
-            message="Pending resources retrieved successfully"
-        )
-        
-    except Exception as e:
-        return internal_error_response(f"Error retrieving pending resources: {str(e)}")
+
+    # Validate dandiset ID
+    is_valid, error_msg = validate_dandiset_id(dandiset_id)
+    if not is_valid:
+        return validation_error_response(error_msg)
+
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    # Validate pagination
+    is_valid, error_msg = validate_pagination_params(page, per_page)
+    if not is_valid:
+        return validation_error_response(error_msg)
+
+    # Get community (pending) resources
+    data = resource_service.get_pending_resources(dandiset_id=dandiset_id)
+
+    # Get response
+    response = paginated_response(
+        data=data,
+        page=page,
+        per_page=per_page,
+        message="Pending resources retrieved successfully"
+    )
+
+    return response
 
 
 # ============================================================================

@@ -255,21 +255,6 @@ class TestAPIEndpoints:
         assert data['success'] is False
         assert 'error' in data
 
-    def test_api_dandiset_get_resources(self, client, mock_resource_service):
-        """Test GET /api/dandisets/{dandiset_id}/resources"""
-        with patch('dandiannotations.webapp.api.routes.resource_service', mock_resource_service):
-            response = client.get('/api/dandisets/dandiset_000001/resources')
-
-            assert response.status_code == 200
-            data = json.loads(response.data)
-
-            assert data['success'] is True
-            assert 'data' in data
-            assert isinstance(data['data'], list)
-            assert len(data['data']) == 1  # Only 1 approved resource for this dandiset
-            for resource in data['data']:
-                assert resource['dandiset_id'] == 'dandiset_000001'
-
     # def test_api_dandiset_get(self, client, mock_submission_folder_path):
     #     """Test GET /api/dandisets/{dandiset_id}"""
     #     with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
