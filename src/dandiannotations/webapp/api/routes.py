@@ -6,6 +6,7 @@ import os
 import sys
 from flask import request, url_for
 from datetime import datetime
+from functools import wraps
 
 # Add the parent directory to the path to import our models
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -35,11 +36,25 @@ resource_repository = FileSystemResourceRepository(base_dir=os.path.join(os.path
 resource_service = ResourceService(repository=resource_repository)
 
 
+def handle_api_errors(error_message=None):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                # Use custom error message or default to function name
+                base_message = error_message or f"Error in {f.__name__.replace('_', ' ')}"
+                return internal_error_response(f"{base_message}: {str(e)}")
+        return decorated_function
+    return decorator
+
 # ============================================================================
 # DANDISET ENDPOINTS
 # ============================================================================
 
 @api_bp.route('/dandisets', methods=['GET'])
+@handle_api_errors("Error retrieving dandisets")
 def list_dandisets():
     """
     GET /api/dandisets
