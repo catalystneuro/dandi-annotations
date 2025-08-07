@@ -116,6 +116,16 @@ class DandisetInfo:
     pending_count: int
     approved_count: int
     total_count: int
+    
+    def serialize(self) -> Dict[str, Any]:
+        """Serialize the dandiset info to a dictionary."""
+        return {
+            'dandiset_id': self.dandiset_id,
+            'display_id': self.display_id,
+            'pending_count': self.pending_count,
+            'approved_count': self.approved_count,
+            'total_count': self.total_count
+        }
 
 
 @dataclass

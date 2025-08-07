@@ -27,40 +27,34 @@ def validate_json_request() -> Tuple[bool, Optional[str]]:
 
 
 def validate_pagination_params(
-    page: Optional[int] = None,
-    per_page: Optional[int] = None,
-    max_per_page: int = 100
-) -> Tuple[bool, Optional[str], Dict[str, int]]:
+    page: int,
+    per_page: int,
+) -> Tuple[bool, Optional[str]]:
     """
     Validate pagination parameters
     
     Args:
         page: Page number
         per_page: Items per page
-        max_per_page: Maximum allowed items per page
     
     Returns:
-        Tuple of (is_valid, error_message, validated_params)
+        Tuple of (is_valid, error_message)
     """
-    # Set defaults
-    validated_page = page if page is not None else 1
-    validated_per_page = per_page if per_page is not None else 10
-    
     # Validate page
-    if validated_page < 1:
-        return False, "Page must be >= 1", {}
-    
+    if not isinstance(page, int):
+        return False, "Page must be an integer"
+
+    if page < 1:
+        return False, "Page must be >= 1"
+
     # Validate per_page
-    if validated_per_page < 1:
-        return False, "Per page must be >= 1", {}
-    
-    if validated_per_page > max_per_page:
-        return False, f"Per page must be <= {max_per_page}", {}
-    
-    return True, None, {
-        'page': validated_page,
-        'per_page': validated_per_page
-    }
+    if not isinstance(per_page, int):
+        return False, "Per page must be an integer"
+
+    if per_page < 1:
+        return False, "Per page must be >= 1"
+
+    return True, None
 
 
 def validate_dandiset_id(dandiset_id: str) -> Tuple[bool, Optional[str]]:

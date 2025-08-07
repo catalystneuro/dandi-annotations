@@ -9,7 +9,8 @@ import yaml
 
 
 from dandiannotations.webapp.app import app
-from dandiannotations.webapp.utils.submission_handler import SubmissionHandler
+from dandiannotations.webapp.data.filesystem_repository import FileSystemResourceRepository
+from dandiannotations.webapp.services.resource_service import ResourceService
 from dandiannotations.webapp.utils.auth import AuthManager
 
 
@@ -27,8 +28,8 @@ class TestAPIEndpoints:
                 yield client
     
     @pytest.fixture
-    def mock_submission_handler(self, tmp_path):
-        """Mock submission handler with test data created programmatically in temporary directory"""
+    def mock_submission_folder_path(self, tmp_path):
+        """Mock submission test data created programmatically in temporary directory"""
         mock_submission_path = tmp_path / "mock_submissions"
         mock_submission_path.mkdir(parents=True, exist_ok=True)
 
@@ -141,11 +142,18 @@ class TestAPIEndpoints:
         community_submission_3_path = community_dir / "20241205_102300_submission.yaml"
         with open(community_submission_3_path, 'w') as f:
             yaml.dump(community_submission_3, f, default_flow_style=False, allow_unicode=True, sort_keys=False, indent=2)
-        
-        # Create submission handler with the temporary directory
-        submission_handler = SubmissionHandler(base_submissions_dir=mock_submission_path)
 
-        return submission_handler
+        return mock_submission_path
+    
+    @pytest.fixture
+    def mock_resource_repository(self, mock_submission_folder_path):
+        """Mock resource repository"""
+        return FileSystemResourceRepository(base_dir=mock_submission_folder_path)
+
+    @pytest.fixture
+    def mock_resource_service(self, mock_resource_repository):
+        """Mock resource service"""
+        return ResourceService(repository=mock_resource_repository)
 
     @pytest.fixture
     def mock_auth_manager(self, tmp_path):
@@ -178,10 +186,10 @@ class TestAPIEndpoints:
             yaml.dump(users_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False, indent=2)
         auth = AuthManager(config_path=config_path)
         return auth
-    
-    def test_api_dandisets_list(self, client, mock_submission_handler):
+
+    def test_api_dandisets_list(self, client, mock_resource_service):
         """Test GET /api/dandisets"""
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.resource_service', mock_resource_service):
             response = client.get('/api/dandisets')
             
             assert response.status_code == 200
@@ -190,10 +198,10 @@ class TestAPIEndpoints:
             assert data['success'] is True
             assert 'data' in data
             assert len(data['data']) == 1  # Only dandiset_000001 has submissions
-            assert data['data'][0]['id'] == 'dandiset_000001'
-            assert data['data'][0]['display_id'] == 'DANDI:000001'
+            assert data['data'][0]['dandiset_id'] == 'dandiset_000001'
+            assert data['data'][0]['display_id'] == '000001'
             assert data['data'][0]['approved_count'] == 1
-            assert data['data'][0]['community_count'] == 3
+            assert data['data'][0]['pending_count'] == 3
             assert data['data'][0]['total_count'] == 4
             assert 'pagination' in data
             assert data['pagination']['page'] == 1
@@ -207,10 +215,10 @@ class TestAPIEndpoints:
             assert data['pagination']['prev_page'] is None
             assert data['pagination']['next_page'] is None
             assert data['message'] == 'Dandisets retrieved successfully'
-    
-    def test_api_dandisets_list_pagination(self, client, mock_submission_handler):
+
+    def test_api_dandisets_list_pagination(self, client, mock_resource_service):
         """Test GET /api/dandisets with pagination"""
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.resource_service', mock_resource_service):
             response = client.get('/api/dandisets?page=1&per_page=1')
             
             assert response.status_code == 200
@@ -219,10 +227,10 @@ class TestAPIEndpoints:
             assert data['success'] is True
             assert 'data' in data
             assert len(data['data']) == 1  # Only dandiset_000001 has submissions
-            assert data['data'][0]['id'] == 'dandiset_000001'
-            assert data['data'][0]['display_id'] == 'DANDI:000001'
+            assert data['data'][0]['dandiset_id'] == 'dandiset_000001'
+            assert data['data'][0]['display_id'] == '000001'
             assert data['data'][0]['approved_count'] == 1
-            assert data['data'][0]['community_count'] == 3
+            assert data['data'][0]['pending_count'] == 3
             assert data['data'][0]['total_count'] == 4
             assert 'pagination' in data
             assert data['pagination']['page'] == 1
@@ -247,9 +255,9 @@ class TestAPIEndpoints:
         assert data['success'] is False
         assert 'error' in data
     
-    def test_api_dandiset_get(self, client, mock_submission_handler):
+    def test_api_dandiset_get(self, client, mock_submission_folder_path):
         """Test GET /api/dandisets/{dandiset_id}"""
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
             response = client.get('/api/dandisets/dandiset_000001')
             
             assert response.status_code == 200
@@ -263,9 +271,9 @@ class TestAPIEndpoints:
             assert data['data']['total_count'] == 4
             assert data['message'] == 'Dandiset information retrieved successfully'
     
-    def test_api_dandiset_get_not_found(self, client, mock_submission_handler):
+    def test_api_dandiset_get_not_found(self, client, mock_submission_folder_path):
         """Test GET /api/dandisets/{dandiset_id} for non-existent dandiset"""
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
             response = client.get('/api/dandisets/dandiset_999999')
             
             assert response.status_code == 404
@@ -291,7 +299,7 @@ class TestAPIEndpoints:
         assert 'general' in data['error']['details']
         assert 'Invalid dandiset ID format' in data['error']['details']['general']
     
-    def test_api_submit_resource_valid(self, client, mock_submission_handler):
+    def test_api_submit_resource_valid(self, client, mock_submission_folder_path):
         """Test POST /api/dandisets/{dandiset_id}/resources with valid data"""
         test_data = {
             'resource_name': 'Test Resource',
@@ -303,7 +311,7 @@ class TestAPIEndpoints:
             'contributor_email': 'test@example.com'
         }
         
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
             response = client.post('/api/dandisets/dandiset_000001/resources',
                                  data=json.dumps(test_data),
                                  content_type='application/json')
@@ -676,9 +684,9 @@ class TestAPIEndpoints:
             assert data['data'] is None
             assert data['message'] == 'Logout successful'
 
-    def test_api_stats_overview(self, client, mock_submission_handler):
+    def test_api_stats_overview(self, client, mock_submission_folder_path):
         """Test GET /api/stats/overview"""
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
             response = client.get('/api/stats/overview')
             
             assert response.status_code == 200
@@ -694,9 +702,9 @@ class TestAPIEndpoints:
             assert data['data']['unique_contributors'] == 2
             assert data['message'] == 'Overview statistics retrieved successfully'
     
-    def test_api_stats_dandiset(self, client, mock_submission_handler):
+    def test_api_stats_dandiset(self, client, mock_submission_folder_path):
         """Test GET /api/stats/dandisets/{dandiset_id}"""
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler):
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
             response = client.get('/api/stats/dandisets/dandiset_000001')
             
             assert response.status_code == 200
@@ -726,13 +734,13 @@ class TestAPIEndpoints:
             }
             assert data['message'] == 'Dandiset statistics retrieved successfully'
     
-    def test_api_pending_submissions_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_pending_submissions_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test GET /api/submissions/pending as moderator"""
         login_data = {
             'username': 'moderator1',
             'password': 'mod123'
         }
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -791,7 +799,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'UNAUTHORIZED'
             assert data['error']['message'] == 'Authentication required'
     
-    def test_api_approve_submission_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_approve_submission_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test POST /api/submissions/{dandiset_id}/{filename}/approve as moderator"""
         login_data = {
             'username': 'moderator1',
@@ -802,7 +810,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -831,7 +839,7 @@ class TestAPIEndpoints:
             assert data['data']['dandiset_id'] == 'dandiset_000001'
             assert data['message'] == 'Submission approved successfully'
 
-    def test_api_approve_submission_invalid_user(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_approve_submission_invalid_user(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test POST /api/submissions/{dandiset_id}/{filename}/approve with invalid user credentials"""
         login_data = {
             'username': 'newuser@example.com',
@@ -842,7 +850,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -861,14 +869,14 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'FORBIDDEN'
             assert data['error']['message'] == 'Moderator privileges required'
     
-    def test_api_approve_submission_unathenticated(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_approve_submission_unathenticated(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test POST /api/submissions/{dandiset_id}/{filename}/approve when unauthenticated"""
         test_data = {
             'moderator_name': 'Moderator One',
             'moderator_email': 'moderator@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             response = client.post('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/approve',
                                  data=json.dumps(test_data),
@@ -882,7 +890,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'UNAUTHORIZED'
             assert data['error']['message'] == 'Authentication required'
     
-    def test_api_approve_submission_not_found(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_approve_submission_not_found(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test POST /api/submissions/{dandiset_id}/{filename}/approve for non-existent submission"""
         login_data = {
             'username': 'moderator1',
@@ -893,7 +901,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
         
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -912,13 +920,13 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'NOT_FOUND'
             assert data['error']['message'] == 'Submission not found'
     
-    def test_api_user_submissions_own_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_user_submissions_own_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test GET /api/submissions/user/{user_email} for own submissions"""
         login_data = {
             'username': 'moderator1',
             'password': 'mod123'
         }
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -945,13 +953,13 @@ class TestAPIEndpoints:
             assert data['data']['approved_pagination']['total_items'] == 1
             assert data['message'] == 'User submissions retrieved successfully'
 
-    def test_api_user_submissions_own_user(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_user_submissions_own_user(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test GET /api/submissions/user/{user_email} for own submissions as user"""
         login_data = {
             'username': 'newuser@example.com',
             'password': 'password123'
         }
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -978,13 +986,13 @@ class TestAPIEndpoints:
             assert data['data']['approved_pagination']['total_items'] == 0
             assert data['message'] == 'User submissions retrieved successfully'
 
-    def test_api_user_submissions_other_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_user_submissions_other_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test GET /api/submissions/user/{user_email} for other user as moderator"""
         login_data = {
             'username': 'moderator1',
             'password': 'mod123'
         }
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1001,13 +1009,13 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'FORBIDDEN'
             assert data['error']['message'] == 'You can only view your own submissions'
 
-    def test_api_user_submissions_other_user(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_user_submissions_other_user(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test GET /api/submissions/user/{user_email} for other user as user"""
         login_data = {
             'username': 'newuser@example.com',
             'password': 'password123'
         }
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1048,7 +1056,7 @@ class TestAPIEndpoints:
         assert data['error']['code'] == 'METHOD_NOT_ALLOWED'
         assert data['error']['message'] == 'Method not allowed'
 
-    def test_api_delete_submission_moderator_community(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_moderator_community(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete for community submission as moderator"""
         login_data = {
             'username': 'moderator1',
@@ -1059,7 +1067,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1083,7 +1091,7 @@ class TestAPIEndpoints:
             assert 'deletion_date' in data['data']
             assert data['message'] == "Submission 'Neural Signal Processing Toolkit' deleted successfully"
 
-    def test_api_delete_submission_moderator_approved(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_moderator_approved(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete for approved submission as moderator"""
         login_data = {
             'username': 'moderator1',
@@ -1094,7 +1102,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1118,7 +1126,7 @@ class TestAPIEndpoints:
             assert 'deletion_date' in data['data']
             assert data['message'] == "Submission 'Example Resource' deleted successfully"
 
-    def test_api_delete_submission_missing_status(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_missing_status(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete without status parameter"""
         login_data = {
             'username': 'moderator1',
@@ -1129,7 +1137,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1151,7 +1159,7 @@ class TestAPIEndpoints:
             assert 'general' in data['error']['details']
             assert data['error']['details']['general'] == "Status parameter must be 'community' or 'approved'"
 
-    def test_api_delete_submission_invalid_status(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_invalid_status(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete with invalid status parameter"""
         login_data = {
             'username': 'moderator1',
@@ -1162,7 +1170,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1184,7 +1192,7 @@ class TestAPIEndpoints:
             assert 'general' in data['error']['details']
             assert data['error']['details']['general'] == "Status parameter must be 'community' or 'approved'"
 
-    def test_api_delete_submission_non_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_non_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete as non-moderator"""
         login_data = {
             'username': 'newuser@example.com',
@@ -1195,7 +1203,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1214,14 +1222,14 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'FORBIDDEN'
             assert data['error']['message'] == 'Moderator privileges required'
 
-    def test_api_delete_submission_unauthenticated(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_unauthenticated(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete when unauthenticated"""
         test_data = {
             'moderator_name': 'Moderator One',
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             response = client.delete('/api/submissions/dandiset_000001/20241201_093000_submission.yaml/delete?status=community',
                                    data=json.dumps(test_data),
@@ -1235,7 +1243,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'UNAUTHORIZED'
             assert data['error']['message'] == 'Authentication required'
 
-    def test_api_delete_submission_not_found(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_not_found(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete for non-existent submission"""
         login_data = {
             'username': 'moderator1',
@@ -1246,7 +1254,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1265,7 +1273,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'NOT_FOUND'
             assert data['error']['message'] == 'Submission not found'
 
-    def test_api_delete_submission_missing_moderator_data(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_submission_missing_moderator_data(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/submissions/{dandiset_id}/{filename}/delete with missing moderator data"""
         login_data = {
             'username': 'moderator1',
@@ -1276,7 +1284,7 @@ class TestAPIEndpoints:
             # Missing moderator_email
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1295,7 +1303,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'VALIDATION_ERROR'
             assert data['error']['message'] == 'Validation failed'
 
-    def test_api_delete_resource_by_id_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_resource_by_id_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/resources/{resource_id} as moderator"""
         login_data = {
             'username': 'moderator1',
@@ -1306,7 +1314,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1331,7 +1339,7 @@ class TestAPIEndpoints:
             assert 'deletion_date' in data['data']
             assert data['message'] == "Resource 'Neural Signal Processing Toolkit' deleted successfully"
 
-    def test_api_delete_resource_by_id_non_moderator(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_resource_by_id_non_moderator(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/resources/{resource_id} as non-moderator"""
         login_data = {
             'username': 'newuser@example.com',
@@ -1342,7 +1350,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1361,14 +1369,14 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'FORBIDDEN'
             assert data['error']['message'] == 'Moderator privileges required'
 
-    def test_api_delete_resource_by_id_unauthenticated(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_resource_by_id_unauthenticated(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/resources/{resource_id} when unauthenticated"""
         test_data = {
             'moderator_name': 'Moderator One',
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             response = client.delete('/api/resources/20241201_093000_submission',
                                    data=json.dumps(test_data),
@@ -1382,7 +1390,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'UNAUTHORIZED'
             assert data['error']['message'] == 'Authentication required'
 
-    def test_api_delete_resource_by_id_not_found(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_resource_by_id_not_found(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/resources/{resource_id} for non-existent resource"""
         login_data = {
             'username': 'moderator1',
@@ -1393,7 +1401,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1412,7 +1420,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'NOT_FOUND'
             assert data['error']['message'] == 'Resource not found'
 
-    def test_api_delete_resource_by_id_missing_moderator_data(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_resource_by_id_missing_moderator_data(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/resources/{resource_id} with missing moderator data"""
         login_data = {
             'username': 'moderator1',
@@ -1423,7 +1431,7 @@ class TestAPIEndpoints:
             # Missing moderator_email
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',
@@ -1442,7 +1450,7 @@ class TestAPIEndpoints:
             assert data['error']['code'] == 'VALIDATION_ERROR'
             assert data['error']['message'] == 'Validation failed'
 
-    def test_api_delete_resource_by_id_wrong_content_type(self, client, mock_submission_handler, mock_auth_manager):
+    def test_api_delete_resource_by_id_wrong_content_type(self, client, mock_submission_folder_path, mock_auth_manager):
         """Test DELETE /api/resources/{resource_id} with wrong content type"""
         login_data = {
             'username': 'moderator1',
@@ -1453,7 +1461,7 @@ class TestAPIEndpoints:
             'moderator_email': 'moderator1@example.com'
         }
 
-        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_handler), \
+        with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path), \
              patch('dandiannotations.webapp.api.routes.auth_manager', mock_auth_manager):
             client.post(
                 '/api/auth/login',

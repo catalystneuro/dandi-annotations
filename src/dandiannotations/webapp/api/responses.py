@@ -209,17 +209,15 @@ def paginated_response(
     data: list,
     page: int,
     per_page: int,
-    total_items: int,
     message: Optional[str] = None
 ) -> tuple:
     """
     Create a paginated response with metadata
     
     Args:
-        data: List of items for current page
+        data: Full list of items to paginate
         page: Current page number
         per_page: Items per page
-        total_items: Total number of items
         message: Optional success message
     
     Returns:
@@ -227,9 +225,17 @@ def paginated_response(
     """
     import math
     
+    total_items = len(data)
     total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
     has_prev = page > 1
     has_next = page < total_pages
+    
+    # Calculate slice indices
+    start_index = (page - 1) * per_page
+    end_index = start_index + per_page
+    
+    # Slice the data for current page
+    page_data = data[start_index:end_index]
     
     pagination = {
         "page": page,
@@ -240,12 +246,12 @@ def paginated_response(
         "has_next": has_next,
         "prev_page": page - 1 if has_prev else None,
         "next_page": page + 1 if has_next else None,
-        "start_item": (page - 1) * per_page + 1 if total_items > 0 else 0,
-        "end_item": min(page * per_page, total_items)
+        "start_item": start_index + 1 if total_items > 0 else 0,
+        "end_item": min(end_index, total_items)
     }
     
     return success_response(
-        data=data,
+        data=page_data,
         message=message,
         pagination=pagination
     )

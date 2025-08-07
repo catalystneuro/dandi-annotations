@@ -540,12 +540,12 @@ class ResourceService:
         except Exception as e:
             raise ResourceNotFoundError(f"Failed to get resource statistics: {str(e)}")
     
-    def get_dandisets_with_resources(self) -> List[DandisetInfo]:
+    def get_dandisets_with_resources(self) -> List[dict]:
         """
         Get information about all dandisets that have resources.
         
         Returns:
-            List of DandisetInfo objects
+            List of serialized DandisetInfo objects
         """
         try:
             dandiset_ids = self.repository.list_dandisets_with_resources()
@@ -558,16 +558,17 @@ class ResourceService:
                 # Create display ID (remove dandiset_ prefix)
                 display_id = dandiset_id.replace('dandiset_', '') if dandiset_id.startswith('dandiset_') else dandiset_id
                 
-                dandiset_infos.append(DandisetInfo(
+                dandiset_info = DandisetInfo(
                     dandiset_id=dandiset_id,
                     display_id=display_id,
                     pending_count=pending_count,
                     approved_count=approved_count,
                     total_count=pending_count + approved_count
-                ))
-            
+                )
+                dandiset_infos.append(dandiset_info.serialize())
+
             # Sort by dandiset ID
-            dandiset_infos.sort(key=lambda d: d.dandiset_id)
+            dandiset_infos.sort(key=lambda d: d['dandiset_id'])
             return dandiset_infos
         except Exception as e:
             raise ResourceNotFoundError(f"Failed to get dandisets with resources: {str(e)}")
