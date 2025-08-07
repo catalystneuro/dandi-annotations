@@ -69,6 +69,7 @@ def list_dandisets():
     if not is_valid:
         return validation_error_response(error_msg)
     
+    # Get data
     data = resource_service.get_dandisets_with_resources()
 
     return paginated_response(
