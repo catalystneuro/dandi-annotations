@@ -72,12 +72,15 @@ def list_dandisets():
     # Get data
     data = resource_service.get_dandisets_with_resources()
 
-    return paginated_response(
+    # Get response
+    response = paginated_response(
         data=data,
         page=page,
         per_page=per_page,
-        message="Dandisets retrieved successfully"
+        message="Dandisets retrieved successfully",
     )
+
+    return response
 
 
 @api_bp.route('/dandisets/<dandiset_id>', methods=['GET'])
