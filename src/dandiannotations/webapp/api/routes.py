@@ -31,10 +31,11 @@ from .validators import (
 from dandiannotations.models.models import ExternalResource, AnnotationContributor
 from dandiannotations.webapp.data.filesystem_repository import FileSystemResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
+from dandiannotations.webapp.utils.auth import AuthManager
 
 resource_repository = FileSystemResourceRepository(base_dir=os.path.join(os.path.dirname(__file__), '..', '..', 'submissions'))
 resource_service = ResourceService(repository=resource_repository)
-
+auth_manager = AuthManager(config_path=os.path.join(os.path.dirname(__file__), '..', 'config', 'auth.yaml'))
 
 def handle_api_errors(error_message=None):
     def decorator(f):
@@ -83,76 +84,70 @@ def list_dandisets():
     return response
 
 
-@api_bp.route('/dandisets/<dandiset_id>', methods=['GET'])
-def get_dandiset(dandiset_id):
-    """
-    GET /api/dandisets/{dandiset_id}
-    Get specific dandiset information
-    """
-    try:
-        # Validate dandiset ID
-        is_valid, error_msg = validate_dandiset_id(dandiset_id)
-        if not is_valid:
-            return validation_error_response(error_msg)
+# @api_bp.route('/dandisets/<dandiset_id>', methods=['GET'])
+# def get_dandiset(dandiset_id):
+#     """
+#     GET /api/dandisets/{dandiset_id}
+#     Get specific dandiset information
+#     """
+#     try:
+#         # Validate dandiset ID
+#         is_valid, error_msg = validate_dandiset_id(dandiset_id)
+#         if not is_valid:
+#             return validation_error_response(error_msg)
         
-        # Get specific dandiset
-        dandiset_info = submission_handler.get_dandiset(dandiset_id)
+#         # Get specific dandiset
+#         dandiset_info = submission_handler.get_dandiset(dandiset_id)
         
-        if not dandiset_info:
-            return not_found_response("Dandiset")
+#         if not dandiset_info:
+#             return not_found_response("Dandiset")
         
-        # Serialize data
-        serialized_dandiset = serialize_dandiset_info(dandiset_info)
+#         # Serialize data
+#         serialized_dandiset = serialize_dandiset_info(dandiset_info)
         
-        return success_response(
-            data=serialized_dandiset,
-            message="Dandiset information retrieved successfully"
-        )
+#         return success_response(
+#             data=serialized_dandiset,
+#             message="Dandiset information retrieved successfully"
+#         )
         
-    except Exception as e:
-        return internal_error_response(f"Error retrieving dandiset: {str(e)}")
+#     except Exception as e:
+#         return internal_error_response(f"Error retrieving dandiset: {str(e)}")
 
 
 @api_bp.route('/dandisets/<dandiset_id>/resources', methods=['GET'])
+@handle_api_errors("Error retrieving dandiset resources")
 def get_dandiset_resources(dandiset_id):
     """
     GET /api/dandisets/{dandiset_id}/resources
     Get all resources for a specific dandiset
     """
-    try:
-        # Validate dandiset ID
-        is_valid, error_msg = validate_dandiset_id(dandiset_id)
-        if not is_valid:
-            return validation_error_response(error_msg)
-        
-        # Get pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        
-        # Validate pagination
-        is_valid, error_msg, validated_params = validate_pagination_params(page, per_page)
-        if not is_valid:
-            return validation_error_response(error_msg)
-        
-        # Get all resources (include community submissions only if authenticated)
-        include_community = auth_manager.is_authenticated()
-        all_resources, pagination_info = submission_handler.get_all_submissions_paginated(
-            dandiset_id, validated_params['page'], validated_params['per_page'], include_community
-        )
-        
-        # Serialize data
-        serialized_resources = serialize_external_resources(all_resources)
-        
-        return paginated_response(
-            data=serialized_resources,
-            page=validated_params['page'],
-            per_page=validated_params['per_page'],
-            total_items=pagination_info['total_items'],
-            message="Dandiset resources retrieved successfully"
-        )
-        
-    except Exception as e:
-        return internal_error_response(f"Error retrieving dandiset resources: {str(e)}")
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    # Validate dandiset ID
+    is_valid, error_msg = validate_dandiset_id(dandiset_id)
+    if not is_valid:
+        return validation_error_response(error_msg)
+    
+    # Validate pagination
+    is_valid, error_msg = validate_pagination_params(page, per_page)
+    if not is_valid:
+        return validation_error_response(error_msg)
+    
+    # Get data (include pending submissions only if authenticated)
+    include_pending = auth_manager.is_authenticated()
+    data = resource_service.get_dandiset_resources(dandiset_id=dandiset_id, include_pending=include_pending)
+
+    # Get response
+    response = paginated_response(
+        data=data,
+        page=page,
+        per_page=per_page,
+        message="Dandiset resources retrieved successfully",
+    )
+
+    return response
 
 
 @api_bp.route('/dandisets/<dandiset_id>/resources/approved', methods=['GET'])

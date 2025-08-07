@@ -278,7 +278,7 @@ class ResourceService:
                 errors={'deletion_error': str(e)}
             )
     
-    def get_dandiset_resources(self, dandiset_id: str, include_pending: bool = True) -> List[Resource]:
+    def get_dandiset_resources(self, dandiset_id: str, include_pending: bool = True) -> List[dict]:
         """
         Get all resources for a dandiset.
         
@@ -287,7 +287,7 @@ class ResourceService:
             include_pending: Whether to include pending resources
             
         Returns:
-            List of Resource objects
+            List of serialized Resource objects
         """
         try:
             resources = []
@@ -295,16 +295,18 @@ class ResourceService:
             # Always get approved resources
             approved_data = self.repository.list_resources(dandiset_id, ResourceStatus.APPROVED)
             for data in approved_data:
-                resources.append(self._create_resource_from_data(data))
-            
+                resource = self._create_resource_from_data(data)
+                resources.append(resource.serialize())
+
             # Optionally get pending resources
             if include_pending:
                 pending_data = self.repository.list_resources(dandiset_id, ResourceStatus.PENDING)
                 for data in pending_data:
-                    resources.append(self._create_resource_from_data(data))
-            
+                    resource = self._create_resource_from_data(data)
+                    resources.append(resource.serialize())
+
             # Sort by annotation_date (newest first)
-            resources.sort(key=lambda r: r.data.get('annotation_date', ''), reverse=True)
+            resources.sort(key=lambda r: r['data']['annotation_date'], reverse=True)
             return resources
         except Exception as e:
             raise ResourceNotFoundError(f"Failed to get dandiset resources: {str(e)}")

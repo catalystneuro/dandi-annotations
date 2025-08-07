@@ -51,6 +51,15 @@ class Resource:
     def contributor_email(self) -> str:
         """Get the contributor email."""
         return self.data.get('annotation_contributor', {}).get('email', '')
+    
+    def serialize(self) -> Dict[str, Any]:
+        """Serialize the resource to a dictionary."""
+        return {
+            'resource_id': self.resource_id,
+            'dandiset_id': self.dandiset_id,
+            'status': self.status.value,
+            'data': self.data
+        }
 
 
 @dataclass
