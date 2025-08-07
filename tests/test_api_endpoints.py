@@ -254,50 +254,6 @@ class TestAPIEndpoints:
         
         assert data['success'] is False
         assert 'error' in data
-
-    # def test_api_dandiset_get(self, client, mock_submission_folder_path):
-    #     """Test GET /api/dandisets/{dandiset_id}"""
-    #     with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
-    #         response = client.get('/api/dandisets/dandiset_000001')
-            
-    #         assert response.status_code == 200
-    #         data = json.loads(response.data)
-            
-    #         assert data['success'] is True
-    #         assert data['data']['id'] == 'dandiset_000001'
-    #         assert data['data']['display_id'] == 'DANDI:000001'
-    #         assert data['data']['approved_count'] == 1
-    #         assert data['data']['community_count'] == 3
-    #         assert data['data']['total_count'] == 4
-    #         assert data['message'] == 'Dandiset information retrieved successfully'
-    
-    # def test_api_dandiset_get_not_found(self, client, mock_submission_folder_path):
-    #     """Test GET /api/dandisets/{dandiset_id} for non-existent dandiset"""
-    #     with patch('dandiannotations.webapp.api.routes.submission_handler', mock_submission_folder_path):
-    #         response = client.get('/api/dandisets/dandiset_999999')
-            
-    #         assert response.status_code == 404
-    #         data = json.loads(response.data)
-
-    #         assert data['success'] is False
-    #         assert 'error' in data
-    #         assert data['error']['code'] == 'NOT_FOUND'
-    #         assert data['error']['message'] == 'Dandiset not found'
-    
-    # def test_api_dandiset_get_invalid_id(self, client):
-    #     """Test GET /api/dandisets/{dandiset_id} with invalid ID"""
-    #     response = client.get('/api/dandisets/invalid_id')
-        
-    #     assert response.status_code == 400
-    #     data = json.loads(response.data)
-        
-    #     assert data['success'] is False
-    #     assert 'error' in data
-    #     assert data['error']['code'] == 'VALIDATION_ERROR'
-    #     assert data['error']['message'] == 'Validation failed'
-    #     assert 'details' in data['error']
-    #     assert 'general' in data['error']['details']
-    #     assert 'Invalid dandiset ID format' in data['error']['details']['general']
     
     def test_api_submit_resource_valid(self, client, mock_submission_folder_path):
         """Test POST /api/dandisets/{dandiset_id}/resources with valid data"""

@@ -84,36 +84,6 @@ def list_dandisets():
     return response
 
 
-# @api_bp.route('/dandisets/<dandiset_id>', methods=['GET'])
-# def get_dandiset(dandiset_id):
-#     """
-#     GET /api/dandisets/{dandiset_id}
-#     Get specific dandiset information
-#     """
-#     try:
-#         # Validate dandiset ID
-#         is_valid, error_msg = validate_dandiset_id(dandiset_id)
-#         if not is_valid:
-#             return validation_error_response(error_msg)
-        
-#         # Get specific dandiset
-#         dandiset_info = submission_handler.get_dandiset(dandiset_id)
-        
-#         if not dandiset_info:
-#             return not_found_response("Dandiset")
-        
-#         # Serialize data
-#         serialized_dandiset = serialize_dandiset_info(dandiset_info)
-        
-#         return success_response(
-#             data=serialized_dandiset,
-#             message="Dandiset information retrieved successfully"
-#         )
-        
-#     except Exception as e:
-#         return internal_error_response(f"Error retrieving dandiset: {str(e)}")
-
-
 @api_bp.route('/dandisets/<dandiset_id>/resources', methods=['GET'])
 @handle_api_errors("Error retrieving dandiset resources")
 def get_dandiset_resources(dandiset_id):
