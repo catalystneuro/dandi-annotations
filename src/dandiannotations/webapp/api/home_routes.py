@@ -11,7 +11,8 @@ from flask import Blueprint, request, jsonify
 from typing import Tuple
 from functools import wraps
 
-from .responses import success_response, internal_error_response
+from .responses import success_response
+from .decorators import handle_api_errors
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
 from dandiannotations.webapp.utils.auth import AuthManager
@@ -25,19 +26,6 @@ resource_repository = ResourceRepository(SUBMISSIONS_DIR)
 resource_service = ResourceService(resource_repository)
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
 auth_manager = AuthManager(config_path=CONFIG_PATH)
-
-def handle_api_errors(error_message=None):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            try:
-                return f(*args, **kwargs)
-            except Exception as e:
-                # Use custom error message or default to function name
-                base_message = error_message or f"Error in {f.__name__.replace('_', ' ')}"
-                return internal_error_response(f"{base_message}: {str(e)}")
-        return decorated_function
-    return decorator
 
 @home_api_bp.route('/dandisets', methods=['GET'])
 @handle_api_errors("Failed to retrieve dandisets")

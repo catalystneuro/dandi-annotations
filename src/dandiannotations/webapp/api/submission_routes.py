@@ -5,10 +5,10 @@ Provides:
 - POST /api/submission -> create a new community submission
 """
 from flask import Blueprint, request
-from functools import wraps
 import os
 
-from .responses import created_response, validation_error_response, internal_error_response
+from .responses import created_response, validation_error_response
+from .decorators import handle_api_errors
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
 
@@ -18,24 +18,6 @@ submission_api_bp = Blueprint('submission_api', __name__, url_prefix='/submissio
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'submissions')
 resource_repository = ResourceRepository(SUBMISSIONS_DIR)
 resource_service = ResourceService(resource_repository)
-
-
-def handle_api_errors(error_message=None):
-    """Decorator to handle API errors consistently"""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            try:
-                return f(*args, **kwargs)
-            except ValueError as e:
-                # Validation errors
-                return validation_error_response(str(e))
-            except Exception as e:
-                # General errors
-                base_message = error_message or f"Error in {f.__name__.replace('_', ' ')}"
-                return internal_error_response(f"{base_message}: {str(e)}")
-        return decorated_function
-    return decorator
 
 
 @submission_api_bp.route('', methods=['POST'])
