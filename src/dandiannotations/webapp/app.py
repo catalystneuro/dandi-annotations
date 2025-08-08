@@ -12,7 +12,8 @@ import re
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from dandiannotations.webapp.utils.yaml_handler import YAMLHandler
-from dandiannotations.webapp.utils.submission_handler import SubmissionHandler
+from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
+from dandiannotations.webapp.services.resource_service import ResourceService
 from dandiannotations.webapp.utils.schema_utils import get_resource_relation_options, get_resource_type_options
 from dandiannotations.webapp.utils.auth import AuthManager, login_required
 from dandiannotations.models.models import ExternalResource, AnnotationContributor
@@ -66,7 +67,8 @@ def handle_500(error):
 
 # Configuration
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'submissions')
-submission_handler = SubmissionHandler(SUBMISSIONS_DIR)
+resource_repository = ResourceRepository(SUBMISSIONS_DIR)
+resource_service = ResourceService(resource_repository)
 
 # Keep old YAML handler for backward compatibility if needed
 YAML_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'external_resources', 'external_resources.yaml')
@@ -120,10 +122,10 @@ def index():
         per_page = 10  # 10 dandisets per page
         
         # Get paginated dandisets with their submission counts
-        paginated_dandisets, pagination_info = submission_handler.get_all_dandisets_paginated(page, per_page)
+        paginated_dandisets, pagination_info = resource_service.get_all_dandisets_paginated(page, per_page)
         
         # Get all dandisets for total statistics (not paginated)
-        all_dandisets = submission_handler.get_all_dandisets()
+        all_dandisets = resource_service.get_all_dandisets()
         
         # Calculate total statistics based on authentication status
         total_approved = sum(ds['approved_count'] for ds in all_dandisets)
