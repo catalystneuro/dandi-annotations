@@ -11,10 +11,14 @@ service method can be wrapped to optionally return a paginated result
 when called with `page` and `per_page` keyword arguments.
 """
 import math
+import re
+from datetime import datetime
 from typing import Tuple, List, Dict, Any, Optional, Callable
 from functools import wraps
+import uuid
 
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
+from dandiannotations.models.models import ExternalResource, AnnotationContributor
 
 
 def _paginate_list(items: List[Any], page: int = 1, per_page: int = 10) -> Tuple[List[Any], Dict[str, Any]]:
@@ -167,4 +171,67 @@ class ResourceService:
             'total_approved': total_approved,
             'total_community': total_community,
             'total_dandisets': total_dandisets,
+        }
+
+    def submit_resource(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate and save a new community submission.
+        
+        Args:
+            form_data: Form data dictionary containing submission fields
+            
+        Returns:
+            Dictionary containing the saved resource data and filename
+            
+        Raises:
+            ValueError: If validation fails (including Pydantic validation errors)
+            Exception: If saving fails
+        """
+        # Create annotation contributor data
+        contributor_data = {
+            'name': form_data['contributor_name'],
+            'email': form_data['contributor_email'],
+            'schemaKey': 'AnnotationContributor'
+        }
+        
+        # Add optional contributor fields if provided
+        if form_data.get('contributor_identifier'):
+            contributor_data['identifier'] = form_data['contributor_identifier']
+        
+        if form_data.get('contributor_url'):
+            contributor_data['url'] = form_data['contributor_url']
+        
+        # Create external resource data
+        resource_data = {
+            'dandiset_id': form_data['dandiset_id'],
+            'annotation_date': datetime.now().astimezone().isoformat(),
+            'name': form_data['resource_name'],
+            'url': form_data['resource_url'],
+            'repository': form_data['repository'],
+            'relation': form_data['relation'],
+            'resourceType': form_data['resource_type'],
+            'schemaKey': 'ExternalResource'
+        }
+        
+        # Add optional resource identifier if provided
+        if form_data.get('resource_identifier'):
+            resource_data['identifier'] = form_data['resource_identifier']
+        
+        # Validate using Pydantic models - let them handle all format validation
+        try:
+            contributor = AnnotationContributor(**contributor_data)
+            resource_data["annotation_contributor"] = contributor
+            resource = ExternalResource(**resource_data)
+            resource_data = resource.model_dump(mode='json', exclude_none=True)
+        except Exception as e:
+            raise ValueError(f'Validation error: {str(e)}')
+        
+        # Save to community submissions folder using repository
+        resource_id = self.repo.save_resource(dandiset_id=form_data['dandiset_id'], external_resource=resource)
+
+        # Return properly formatted response data for API consumption
+        return {
+            'resource_id': resource_id,
+            'status': 'pending',
+            'resource': resource_data,
         }

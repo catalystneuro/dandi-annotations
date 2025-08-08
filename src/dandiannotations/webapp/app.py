@@ -180,90 +180,48 @@ def submit_form():
 def submit_resource():
     """Handle form submission"""
     try:
-        # Get form data
+        # Get form data and convert to dictionary
         form_data = request.form.to_dict()
         
-        # Validate required fields (including dandiset_id)
-        required_fields = ['dandiset_id', 'resource_name', 'resource_url', 'repository', 
-                          'relation', 'resource_type', 'contributor_name', 
-                          'contributor_email']
+        # Call the submission API
+        api_base = request.host_url.rstrip('/')
+        response = requests.post(
+            f"{api_base}/api/submission", 
+            json=form_data, 
+            headers={'Content-Type': 'application/json'},
+            timeout=10
+        )
         
-        for field in required_fields:
-            if not form_data.get(field, '').strip():
-                flash(f'Error: {field.replace("_", " ").title()} is required', 'error')
-                return redirect(url_for('index'))
+        if response.status_code == 201:
+            # Success - extract dandiset_id from response
+            result_data = response.json().get('data', {})
+            dandiset_id = result_data.get('dandiset_id', form_data.get('dandiset_id'))
+            flash('Resource successfully submitted for community review!', 'success')
+            return redirect(url_for('success', dandiset_id=dandiset_id))
+        else:
+            # API returned an error - extract error message
+            error_data = response.json()
+            if 'error' in error_data:
+                error_message = error_data['error'].get('message', 'Unknown error occurred')
+                if 'details' in error_data['error']:
+                    details = error_data['error']['details']
+                    if isinstance(details, dict):
+                        # Format validation errors nicely
+                        for field, field_error in details.items():
+                            error_message = f"{field}: {field_error}"
+                            break  # Show only the first error for simplicity
+            else:
+                error_message = f"Submission failed with status {response.status_code}"
+            
+            flash(f'Error: {error_message}', 'error')
+            return redirect(url_for('submit_form'))
         
-        # Validate dandiset_id format
-        if not validate_dandiset_id(form_data['dandiset_id']):
-            flash('Error: Invalid DANDI set ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)', 'error')
-            return redirect(url_for('index'))
-        
-        # Validate email format
-        if not validate_email(form_data['contributor_email']):
-            flash('Error: Invalid email format', 'error')
-            return redirect(url_for('index'))
-        
-        # Validate URLs
-        if not validate_url(form_data['resource_url']):
-            flash('Error: Invalid resource URL format', 'error')
-            return redirect(url_for('index'))
-        
-        if form_data.get('contributor_url') and not validate_url(form_data['contributor_url']):
-            flash('Error: Invalid contributor URL format', 'error')
-            return redirect(url_for('index'))
-        
-        # Validate ORCID if provided
-        if not validate_orcid(form_data.get('contributor_identifier')):
-            flash('Error: Invalid ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000', 'error')
-            return redirect(url_for('index'))
-        
-        # Create annotation contributor
-        contributor_data = {
-            'name': form_data['contributor_name'],
-            'email': form_data['contributor_email'],
-            'schemaKey': 'AnnotationContributor'
-        }
-        
-        if form_data.get('contributor_identifier'):
-            contributor_data['identifier'] = form_data['contributor_identifier']
-        
-        if form_data.get('contributor_url'):
-            contributor_data['url'] = form_data['contributor_url']
-        
-        # Create external resource data (including dandiset_id)
-        resource_data = {
-            'dandiset_id': form_data['dandiset_id'],
-            'annotation_contributor': contributor_data,
-            'annotation_date': datetime.now().astimezone().isoformat(),
-            'name': form_data['resource_name'],
-            'url': form_data['resource_url'],
-            'repository': form_data['repository'],
-            'relation': form_data['relation'],
-            'resourceType': form_data['resource_type'],
-            'schemaKey': 'ExternalResource'
-        }
-        
-        # Add optional resource identifier if provided
-        if form_data.get('resource_identifier'):
-            resource_data['identifier'] = form_data['resource_identifier']
-        
-        # Validate using Pydantic models
-        try:
-            contributor = AnnotationContributor(**contributor_data)
-            resource = ExternalResource(**resource_data)
-        except Exception as e:
-            flash(f'Validation error: {str(e)}', 'error')
-            return redirect(url_for('index'))
-        
-        # Save to community submissions folder using new submission handler
-        filename = submission_handler.save_community_submission(form_data['dandiset_id'], resource_data)
-        
-        flash('Resource successfully submitted for community review!', 'success')
-        return redirect(url_for('success', dandiset_id=form_data['dandiset_id']))
-        
+    except requests.exceptions.RequestException as e:
+        flash(f'Error connecting to submission service: {str(e)}', 'error')
+        return redirect(url_for('submit_form'))
     except Exception as e:
-        flash(f'Error saving resource: {str(e)}', 'error')
-        return redirect(url_for('index'))
+        flash(f'Error submitting resource: {str(e)}', 'error')
+        return redirect(url_for('submit_form'))
 
 @app.route('/success')
 def success():

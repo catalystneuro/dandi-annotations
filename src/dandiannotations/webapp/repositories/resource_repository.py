@@ -17,6 +17,10 @@ import math
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
+import uuid
+
+# Import for type hinting
+from dandiannotations.models.models import ExternalResource
 
 
 class ResourceRepository:
@@ -56,37 +60,30 @@ class ResourceRepository:
         approved_dir.mkdir(parents=True, exist_ok=True)
         return approved_dir
 
-    def _generate_submission_filename(self) -> str:
-        """Generate a timestamped filename for a new submission"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"{timestamp}_submission.yaml"
-
-    def save_community_submission(self, dandiset_id: str, resource_data: Dict[str, Any]) -> str:
+    def save_resource(self, dandiset_id: str, external_resource: ExternalResource) -> str:
         """
         Save a new community submission
 
         Args:
             dandiset_id: The dandiset identifier
-            resource_data: The resource data to save
+            external_resource: The ExternalResource Pydantic model to save
 
         Returns:
-            The filename of the saved submission
+            The resource ID of the saved resource
         """
-        try:
-            community_dir = self._get_community_dir(dandiset_id)
-            filename = self._generate_submission_filename()
-            filepath = community_dir / filename
+        community_dir = self._get_community_dir(dandiset_id)
+        resource_id = str(uuid.uuid4())
+        filename = f"{resource_id}.yaml"
+        filepath = community_dir / filename
 
-            # Ensure dandiset_id is in the resource data
-            resource_data['dandiset_id'] = dandiset_id
+        # Convert Pydantic model to dict for YAML serialization
+        resource_data = external_resource.model_dump(mode='json', exclude_none=True)
 
-            with open(filepath, 'w', encoding='utf-8') as file:
-                yaml.dump(resource_data, file, default_flow_style=False,
-                         allow_unicode=True, sort_keys=False, indent=2)
+        with open(filepath, 'w', encoding='utf-8') as file:
+            yaml.dump(resource_data, file, default_flow_style=False,
+                        allow_unicode=True, sort_keys=False, indent=2)
 
-            return filename
-        except Exception as e:
-            raise Exception(f"Error saving community submission: {str(e)}")
+        return resource_id
 
     def get_community_submissions(self, dandiset_id: str) -> List[Dict[str, Any]]:
         """
