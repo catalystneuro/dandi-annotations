@@ -122,8 +122,8 @@ def index():
         per_page = 10  # 10 dandisets per page
         
         # Get paginated dandisets with their submission counts
-        paginated_dandisets, pagination_info = resource_service.get_all_dandisets_paginated(page, per_page)
-        
+        paginated_dandisets, pagination_info = resource_service.get_all_dandisets(page=page, per_page=per_page)
+
         # Get all dandisets for total statistics (not paginated)
         all_dandisets = resource_service.get_all_dandisets()
         

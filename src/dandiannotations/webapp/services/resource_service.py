@@ -4,22 +4,97 @@ ResourceService: business/service layer for resources/dandisets.
 This service implements the higher-level dandiset listing logic (moved
 from the previous repository implementation). It uses the repository
 for low-level file reads (community/approved submission lists) but
-performs aggregation and pagination itself.
+performs aggregation itself.
 
-Public methods:
-- get_all_dandisets()
-- get_all_dandisets_paginated(page, per_page)
+Pagination is provided as a decorator `paginate` so any list-returning
+service method can be wrapped to optionally return a paginated result
+when called with `page` and `per_page` keyword arguments.
 """
 import math
-from typing import Tuple, List, Dict, Any, Optional
+from typing import Tuple, List, Dict, Any, Optional, Callable
+from functools import wraps
 
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
+
+
+def _paginate_list(items: List[Any], page: int = 1, per_page: int = 10) -> Tuple[List[Any], Dict[str, Any]]:
+    """
+    Paginate a list of items and return pagination metadata.
+
+    Returns (paginated_items, pagination_info).
+    """
+    total_items = len(items)
+    total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
+
+    # Ensure page is within valid range
+    page = max(1, min(page, total_pages))
+
+    # Calculate start and end indices
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+
+    # Get paginated items
+    paginated_items = items[start_idx:end_idx]
+
+    # Create pagination info
+    pagination_info = {
+        'page': page,
+        'per_page': per_page,
+        'total_items': total_items,
+        'total_pages': total_pages,
+        'has_prev': page > 1,
+        'has_next': page < total_pages,
+        'prev_page': page - 1 if page > 1 else None,
+        'next_page': page + 1 if page < total_pages else None,
+        'start_item': start_idx + 1 if total_items > 0 else 0,
+        'end_item': min(end_idx, total_items)
+    }
+
+    return paginated_items, pagination_info
+
+
+def paginate(func: Callable) -> Callable:
+    """
+    Decorator that makes a list-returning function optionally paginated.
+
+    Behavior:
+    - If called without `page` and `per_page` kwargs: returns the original list.
+    - If called with `page` (and optionally `per_page`): returns (paginated_list, pagination_info).
+
+    Usage:
+        @paginate
+        def get_items(self) -> List[dict]:
+            ...
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Extract pagination params if provided
+        page = kwargs.pop('page', None)
+        per_page = kwargs.pop('per_page', None)
+
+        # Call the original function to get the full list
+        items = func(*args, **kwargs)
+
+        # If no pagination requested, return full items
+        if page is None and per_page is None:
+            return items
+
+        # Use defaults if only one provided
+        if page is None:
+            page = 1
+        if per_page is None:
+            per_page = 10
+
+        return _paginate_list(items, page, per_page)
+
+    return wrapper
 
 
 class ResourceService:
     def __init__(self, repository: ResourceRepository):
         self.repo = repository
 
+    @paginate
     def get_all_dandisets(self) -> List[Dict[str, Any]]:
         """
         Return all dandisets that have submissions (community or approved).
@@ -30,6 +105,10 @@ class ResourceService:
         - community_count
         - approved_count
         - total_count
+
+        When called with kwargs `page` and `per_page` this method will
+        return a tuple (paginated_list, pagination_info) due to the
+        `@paginate` decorator.
         """
         dandisets = []
 
@@ -59,47 +138,3 @@ class ResourceService:
         # Sort by dandiset ID
         dandisets.sort(key=lambda x: x['id'])
         return dandisets
-
-    def _paginate_list(self, items: List[Any], page: int = 1, per_page: int = 10) -> Tuple[List[Any], Dict[str, Any]]:
-        """
-        Paginate a list of items and return pagination metadata.
-
-        Returns (paginated_items, pagination_info).
-        """
-        total_items = len(items)
-        total_pages = math.ceil(total_items / per_page) if total_items > 0 else 1
-
-        # Ensure page is within valid range
-        page = max(1, min(page, total_pages))
-
-        # Calculate start and end indices
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-
-        # Get paginated items
-        paginated_items = items[start_idx:end_idx]
-
-        # Create pagination info
-        pagination_info = {
-            'page': page,
-            'per_page': per_page,
-            'total_items': total_items,
-            'total_pages': total_pages,
-            'has_prev': page > 1,
-            'has_next': page < total_pages,
-            'prev_page': page - 1 if page > 1 else None,
-            'next_page': page + 1 if page < total_pages else None,
-            'start_item': start_idx + 1 if total_items > 0 else 0,
-            'end_item': min(end_idx, total_items)
-        }
-
-        return paginated_items, pagination_info
-
-    def get_all_dandisets_paginated(self, page: int = 1, per_page: int = 10) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Return paginated dandisets that have submissions.
-
-        This method uses get_all_dandisets() and paginates the result.
-        """
-        all_dandisets = self.get_all_dandisets()
-        return self._paginate_list(all_dandisets, page, per_page)
