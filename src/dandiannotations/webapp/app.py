@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_session import Session
 from datetime import datetime, timedelta
 import re
+import requests
 
 # Add the parent directory to the path to import our models
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -119,18 +120,28 @@ def index():
     try:
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
-        per_page = 10  # 10 dandisets per page
-        
-        # Get paginated dandisets with their submission counts
-        paginated_dandisets, pagination_info = resource_service.get_all_dandisets(page=page, per_page=per_page)
+        per_page = 10
 
-        # Overview statistics provided by the service layer
+        # Call the homepage API endpoints
+        api_base = request.host_url.rstrip('/')
+
+        # Get paginated dandisets
+        resp = requests.get(f"{api_base}/api/home/dandisets", params={'page': page, 'per_page': per_page}, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        paginated_dandisets = data['dandisets']
+        pagination_info = data["pagination"]
+
+        # Get overview statistics
         show_community_stats = auth_manager.is_authenticated()
-        stats = resource_service.get_overview_stats(include_community=show_community_stats)
-        total_approved = stats['total_approved']
-        total_dandisets = stats['total_dandisets']
-        total_community = stats['total_community']
-        
+        resp = requests.get(f"{api_base}/api/home/dandisets/overview", params={'include_community': str(show_community_stats).lower()}, timeout=5)
+        resp.raise_for_status()
+        stats = resp.json()
+
+        total_approved = stats.get('total_approved', 0)
+        total_dandisets = stats.get('total_dandisets', 0)
+        total_community = stats.get('total_community', 0)
+
         return render_template('homepage.html',
                              all_dandisets=paginated_dandisets,
                              pagination=pagination_info,
