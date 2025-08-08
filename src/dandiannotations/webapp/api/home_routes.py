@@ -14,6 +14,7 @@ from functools import wraps
 from .responses import success_response, internal_error_response
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
+from dandiannotations.webapp.utils.auth import AuthManager
 import os
 
 home_api_bp = Blueprint('home_api', __name__, url_prefix='/home')
@@ -22,7 +23,8 @@ home_api_bp = Blueprint('home_api', __name__, url_prefix='/home')
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'submissions')
 resource_repository = ResourceRepository(SUBMISSIONS_DIR)
 resource_service = ResourceService(resource_repository)
-
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+auth_manager = AuthManager(config_path=CONFIG_PATH)
 
 def handle_api_errors(error_message=None):
     def decorator(f):
@@ -61,10 +63,9 @@ def get_overview_stats():
     """
     Return overview statistics.
 
-    Query params:
-    - include_community (true|false) - whether to include community counts in totals.
+    If the user is a moderator, include community counts in the totals.
     """
-    include_community = request.args.get('include_community', 'false').lower() in ('1', 'true', 'yes')
+    include_community = auth_manager.is_moderator()
     stats = resource_service.get_overview_stats(include_community=include_community)
     response = success_response(data=stats, message="Overview statistics retrieved successfully.")
     return response
