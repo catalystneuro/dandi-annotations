@@ -158,6 +158,12 @@ def index():
                              total_approved=0,
                              total_dandisets=0,
                              show_community_stats=False)
+    
+@app.route('/how-it-works')
+def how_it_works():
+    """How it works information page"""
+    return render_template('how_it_works.html')
+
 
 @app.route('/submit')
 def submit_form():
@@ -169,10 +175,6 @@ def submit_form():
                          relation_options=relation_options,
                          type_options=type_options)
 
-@app.route('/how-it-works')
-def how_it_works():
-    """How it works information page"""
-    return render_template('how_it_works.html')
 
 @app.route('/submit', methods=['POST'])
 def submit_resource():
