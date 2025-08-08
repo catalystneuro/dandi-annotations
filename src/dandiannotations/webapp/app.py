@@ -191,8 +191,31 @@ def submit_resource():
             headers={'Content-Type': 'application/json'},
             timeout=10
         )
-        response.raise_for_status()
-
+        
+        if response.status_code == 201:
+            # Success - extract dandiset_id from response
+            result_data = response.json().get('data', {})
+            dandiset_id = result_data.get('dandiset_id', form_data.get('dandiset_id'))
+            flash('Resource successfully submitted for community review!', 'success')
+            return redirect(url_for('success', dandiset_id=dandiset_id))
+        else:
+            # API returned an error - extract error message
+            error_data = response.json()
+            if 'error' in error_data:
+                error_message = error_data['error'].get('message', 'Unknown error occurred')
+                if 'details' in error_data['error']:
+                    details = error_data['error']['details']
+                    if isinstance(details, dict):
+                        # Format validation errors nicely
+                        for field, field_error in details.items():
+                            error_message = f"{field}: {field_error}"
+                            break  # Show only the first error for simplicity
+            else:
+                error_message = f"Submission failed with status {response.status_code}"
+            
+            flash(f'Error: {error_message}', 'error')
+            return redirect(url_for('submit_form'))
+        
     except requests.exceptions.RequestException as e:
         flash(f'Error connecting to submission service: {str(e)}', 'error')
         return redirect(url_for('submit_form'))
