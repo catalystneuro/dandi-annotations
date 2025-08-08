@@ -126,17 +126,17 @@ def index():
         api_base = request.host_url.rstrip('/')
 
         # Get paginated dandisets
-        resp = requests.get(f"{api_base}/api/home/dandisets", params={'page': page, 'per_page': per_page}, timeout=5)
-        resp.raise_for_status()
-        data = resp.json()
-        paginated_dandisets = data['dandisets']
+        response = requests.get(f"{api_base}/api/home/dandisets", params={'page': page, 'per_page': per_page}, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        paginated_dandisets = data['data']
         pagination_info = data["pagination"]
 
         # Get overview statistics
         show_community_stats = auth_manager.is_authenticated()
-        resp = requests.get(f"{api_base}/api/home/dandisets/overview", params={'include_community': str(show_community_stats).lower()}, timeout=5)
-        resp.raise_for_status()
-        stats = resp.json()
+        response = requests.get(f"{api_base}/api/home/dandisets/overview", params={'include_community': str(show_community_stats).lower()}, timeout=5)
+        response.raise_for_status()
+        stats = response.json()
 
         total_approved = stats.get('total_approved', 0)
         total_dandisets = stats.get('total_dandisets', 0)

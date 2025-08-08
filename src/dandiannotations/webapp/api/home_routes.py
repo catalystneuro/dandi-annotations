@@ -10,6 +10,7 @@ This is intentionally small and independent so you can start from scratch for th
 from flask import Blueprint, request, jsonify
 from typing import Tuple
 
+from .responses import success_response, internal_error_response
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
 import os
@@ -35,15 +36,11 @@ def get_all_dandisets():
         page = request.args.get('page', default=1, type=int)
         per_page = request.args.get('per_page', default=10, type=int)
 
-        if page is None and per_page is None:
-            dandisets = resource_service.get_all_dandisets()
-            return jsonify({'dandisets': dandisets}), 200
-
-        # decorator returns (paginated_list, pagination_info) when passed page/per_page
-        paginated, pagination = resource_service.get_all_dandisets(page=page, per_page=per_page)
-        return jsonify({'dandisets': paginated, 'pagination': pagination}), 200
+        dandisets, pagination = resource_service.get_all_dandisets(page=page, per_page=per_page)
+        response = success_response(data=dandisets, pagination=pagination, message="Dandisets retrieved successfully.")
+        return response
     except Exception as e:
-        return jsonify({'error': 'Internal server error', 'message': str(e)}), 500
+        return internal_error_response(message=str(e))
 
 
 @home_api_bp.route('/dandisets/overview', methods=['GET'])
