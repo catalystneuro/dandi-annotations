@@ -9,6 +9,7 @@ This is intentionally small and independent so you can start from scratch for th
 """
 from flask import Blueprint, request, jsonify
 from typing import Tuple
+from functools import wraps
 
 from .responses import success_response, internal_error_response
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
@@ -23,7 +24,21 @@ resource_repository = ResourceRepository(SUBMISSIONS_DIR)
 resource_service = ResourceService(resource_repository)
 
 
+def handle_api_errors(error_message=None):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                # Use custom error message or default to function name
+                base_message = error_message or f"Error in {f.__name__.replace('_', ' ')}"
+                return internal_error_response(f"{base_message}: {str(e)}")
+        return decorated_function
+    return decorator
+
 @home_api_bp.route('/dandisets', methods=['GET'])
+@handle_api_errors("Failed to retrieve dandisets")
 def get_all_dandisets():
     """
     Return paginated dandisets.
@@ -32,18 +47,16 @@ def get_all_dandisets():
     - page (int, optional, default=1)
     - per_page (int, optional, default=10)
     """
-    try:
-        page = request.args.get('page', default=1, type=int)
-        per_page = request.args.get('per_page', default=10, type=int)
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=10, type=int)
 
-        dandisets, pagination = resource_service.get_all_dandisets(page=page, per_page=per_page)
-        response = success_response(data=dandisets, pagination=pagination, message="Dandisets retrieved successfully.")
-        return response
-    except Exception as e:
-        return internal_error_response(message=str(e))
+    dandisets, pagination = resource_service.get_all_dandisets(page=page, per_page=per_page)
+    response = success_response(data=dandisets, pagination=pagination, message="Dandisets retrieved successfully.")
+    return response
 
 
 @home_api_bp.route('/dandisets/overview', methods=['GET'])
+@handle_api_errors("Failed to retrieve overview statistics")
 def get_overview_stats():
     """
     Return overview statistics.
@@ -51,10 +64,7 @@ def get_overview_stats():
     Query params:
     - include_community (true|false) - whether to include community counts in totals.
     """
-    try:
-        include_community = request.args.get('include_community', 'false').lower() in ('1', 'true', 'yes')
-        stats = resource_service.get_overview_stats(include_community=include_community)
-        response = success_response(data=stats, message="Overview statistics retrieved successfully.")
-        return response
-    except Exception as e:
-        return internal_error_response(message=str(e))
+    include_community = request.args.get('include_community', 'false').lower() in ('1', 'true', 'yes')
+    stats = resource_service.get_overview_stats(include_community=include_community)
+    response = success_response(data=stats, message="Overview statistics retrieved successfully.")
+    return response
