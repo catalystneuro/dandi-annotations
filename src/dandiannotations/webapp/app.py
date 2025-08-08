@@ -124,21 +124,12 @@ def index():
         # Get paginated dandisets with their submission counts
         paginated_dandisets, pagination_info = resource_service.get_all_dandisets(page=page, per_page=per_page)
 
-        # Get all dandisets for total statistics (not paginated)
-        all_dandisets = resource_service.get_all_dandisets()
-        
-        # Calculate total statistics based on authentication status
-        total_approved = sum(ds['approved_count'] for ds in all_dandisets)
-        total_dandisets = len(all_dandisets)
-        
-        # For authenticated moderators, show both approved and pending
-        # For public users, only show approved resources
-        if auth_manager.is_authenticated():
-            total_community = sum(ds['community_count'] for ds in all_dandisets)
-            show_community_stats = True
-        else:
-            total_community = 0
-            show_community_stats = False
+        # Overview statistics provided by the service layer
+        show_community_stats = auth_manager.is_authenticated()
+        stats = resource_service.get_overview_stats(include_community=show_community_stats)
+        total_approved = stats['total_approved']
+        total_dandisets = stats['total_dandisets']
+        total_community = stats['total_community']
         
         return render_template('homepage.html',
                              all_dandisets=paginated_dandisets,

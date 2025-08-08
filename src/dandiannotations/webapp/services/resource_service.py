@@ -138,3 +138,33 @@ class ResourceService:
         # Sort by dandiset ID
         dandisets.sort(key=lambda x: x['id'])
         return dandisets
+
+    def get_overview_stats(self, include_community: bool = False) -> Dict[str, Any]:
+        """
+        Compute overview statistics across all dandisets.
+
+        Args:
+            include_community: If True include community submissions in totals;
+                               otherwise community totals will be zeroed.
+
+        Returns:
+            Dict with keys:
+              - total_approved: int
+              - total_community: int
+              - total_dandisets: int
+        """
+        # Call get_all_dandisets without pagination to get the aggregated list
+        all_dandisets = self.get_all_dandisets()
+        total_approved = sum(ds.get('approved_count', 0) for ds in all_dandisets)
+        total_dandisets = len(all_dandisets)
+
+        if include_community:
+            total_community = sum(ds.get('community_count', 0) for ds in all_dandisets)
+        else:
+            total_community = 0
+
+        return {
+            'total_approved': total_approved,
+            'total_community': total_community,
+            'total_dandisets': total_dandisets,
+        }
