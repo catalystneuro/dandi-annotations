@@ -28,22 +28,19 @@ def get_all_dandisets():
     Return paginated dandisets.
 
     Query params:
-    - page (int, optional)
-    - per_page (int, optional)
-
-    If page/per_page are omitted the full list is returned as JSON array.
-    If provided, returns JSON object: { "dandisets": [...], "pagination": {...} }
+    - page (int, optional, default=1)
+    - per_page (int, optional, default=10)
     """
     try:
-        page = request.args.get('page', type=int)
-        per_page = request.args.get('per_page', type=int)
+        page = request.args.get('page', default=1, type=int)
+        per_page = request.args.get('per_page', default=10, type=int)
 
         if page is None and per_page is None:
             dandisets = resource_service.get_all_dandisets()
             return jsonify({'dandisets': dandisets}), 200
 
         # decorator returns (paginated_list, pagination_info) when passed page/per_page
-        paginated, pagination = resource_service.get_all_dandisets(page=page or 1, per_page=per_page or 10)
+        paginated, pagination = resource_service.get_all_dandisets(page=page, per_page=per_page)
         return jsonify({'dandisets': paginated, 'pagination': pagination}), 200
     except Exception as e:
         return jsonify({'error': 'Internal server error', 'message': str(e)}), 500
