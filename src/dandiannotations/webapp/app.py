@@ -136,7 +136,7 @@ def index():
         show_community_stats = auth_manager.is_authenticated()
         response = requests.get(f"{api_base}/api/home/dandisets/overview", params={'include_community': str(show_community_stats).lower()}, timeout=5)
         response.raise_for_status()
-        stats = response.json()
+        stats = response.json()['data']
 
         total_approved = stats.get('total_approved', 0)
         total_dandisets = stats.get('total_dandisets', 0)

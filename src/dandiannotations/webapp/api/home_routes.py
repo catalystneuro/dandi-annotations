@@ -54,6 +54,7 @@ def get_overview_stats():
     try:
         include_community = request.args.get('include_community', 'false').lower() in ('1', 'true', 'yes')
         stats = resource_service.get_overview_stats(include_community=include_community)
-        return jsonify(stats), 200
+        response = success_response(data=stats, message="Overview statistics retrieved successfully.")
+        return response
     except Exception as e:
-        return jsonify({'error': 'Internal server error', 'message': str(e)}), 500
+        return internal_error_response(message=str(e))
