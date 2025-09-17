@@ -156,14 +156,26 @@ class ResourceService:
               - total_approved: int
               - total_community: int
               - total_dandisets: int
+              - unique_contributors: int (distinct contributor names across pending when include_community=True)
         """
         # Call get_all_dandisets without pagination to get the aggregated list
         all_dandisets = self.get_all_dandisets()
         total_approved = sum(ds.get('approved_count', 0) for ds in all_dandisets)
         total_dandisets = len(all_dandisets)
 
+        unique_contributors = 0
         if include_community:
             total_community = sum(ds.get('community_count', 0) for ds in all_dandisets)
+
+            # Compute distinct contributor names across all pending submissions
+            contributor_names = set()
+            for ds in all_dandisets:
+                if ds.get('community_count', 0) > 0:
+                    for sub in self.repo.get_community_submissions(ds['id']):
+                        name = sub.get('annotation_contributor', {}).get('name')
+                        if name:
+                            contributor_names.add(name)
+            unique_contributors = len(contributor_names)
         else:
             total_community = 0
 
@@ -171,6 +183,7 @@ class ResourceService:
             'total_approved': total_approved,
             'total_community': total_community,
             'total_dandisets': total_dandisets,
+            'unique_contributors': unique_contributors,
         }
 
     def submit_resource(self, form_data: Dict[str, Any]) -> Dict[str, Any]:

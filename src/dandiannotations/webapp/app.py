@@ -311,26 +311,43 @@ def moderate():
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 9 submissions per page for 3x3 grid
-        
-        # Get paginated pending community submissions across all dandisets
-        pending_submissions, pagination_info = submission_handler.get_all_pending_submissions_paginated(page, per_page)
-        
-        # Get all pending submissions for calculating total unique counts
-        all_pending_submissions = submission_handler.get_all_pending_submissions()
-        
-        # Calculate total unique counts
-        total_unique_dandisets = len(set(submission.get('_dandiset_id') for submission in all_pending_submissions))
-        total_unique_contributors = len(set(submission.get('annotation_contributor', {}).get('name') for submission in all_pending_submissions if submission.get('annotation_contributor', {}).get('name')))
-        
-        # Get all dandisets for navigation
-        all_dandisets = submission_handler.get_all_dandisets()
-        
+
+        api_base = request.host_url.rstrip('/')
+
+        # Fetch paginated pending submissions for grid (moderator-only)
+        resp = requests.get(
+            f"{api_base}/api/submissions/pending",
+            params={'page': page, 'per_page': per_page},
+            cookies=request.cookies,
+            timeout=5
+        )
+        resp.raise_for_status()
+        resp_json = resp.json()
+        pending_submissions = resp_json.get('data', [])
+        pagination_info = resp_json.get('pagination', {'page': page, 'per_page': per_page})
+
+        # Ensure template compatibility: add _dandiset_id for each resource if missing
+        for res in pending_submissions:
+            if '_dandiset_id' not in res and 'dandiset_id' in res:
+                res['_dandiset_id'] = res['dandiset_id']
+
+        # Fetch overview stats from new API for global counts
+        overview_resp = requests.get(
+            f"{api_base}/api/home/dandisets/overview",
+            cookies=request.cookies,
+            timeout=5
+        )
+        overview_resp.raise_for_status()
+        overview_data = overview_resp.json().get('data', {}) if overview_resp.headers.get('Content-Type', '').startswith('application/json') else overview_resp.json()
+
+        total_unique_dandisets = overview_data.get('total_dandisets', 0)
+        total_unique_contributors = overview_data.get('unique_contributors', 0)
+
         return render_template('moderation.html',
-                             pending_submissions=pending_submissions,
-                             pagination=pagination_info,
-                             all_dandisets=all_dandisets,
-                             total_unique_dandisets=total_unique_dandisets,
-                             total_unique_contributors=total_unique_contributors)
+                               pending_submissions=pending_submissions,
+                               pagination=pagination_info,
+                               total_unique_dandisets=total_unique_dandisets,
+                               total_unique_contributors=total_unique_contributors)
     except Exception as e:
         flash(f'Error loading pending submissions: {str(e)}', 'error')
         return redirect(url_for('index'))
