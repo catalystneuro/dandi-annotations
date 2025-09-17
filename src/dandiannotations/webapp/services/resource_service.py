@@ -235,3 +235,65 @@ class ResourceService:
             'status': 'pending',
             'resource': resource_data,
         }
+
+    @paginate
+    def get_approved_resources(self, dandiset_id: str) -> List[Dict[str, Any]]:
+        """
+        Return approved resources for a dandiset.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        return self.repo.get_approved_submissions(dandiset_id)
+
+    @paginate
+    def get_pending_resources(self, dandiset_id: str) -> List[Dict[str, Any]]:
+        """
+        Return community (pending) resources for a dandiset.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        return self.repo.get_community_submissions(dandiset_id)
+
+    def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
+        """
+        Return detailed statistics for a specific dandiset.
+        Computed from approved + community lists to avoid brittle existence checks.
+        """
+        # Fetch lists using repository helpers (these tolerate missing dirs)
+        approved_submissions = self.repo.get_approved_submissions(dandiset_id)
+        community_submissions = self.repo.get_community_submissions(dandiset_id)
+
+        # Build display ID
+        display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+
+        # Aggregate counts
+        approved_count = len(approved_submissions)
+        pending_count = len(community_submissions)
+        total_count = approved_count + pending_count
+
+        # Unique contributors across both lists
+        unique_contributors = len({
+            sub.get('annotation_contributor', {}).get('name')
+            for sub in approved_submissions + community_submissions
+            if sub.get('annotation_contributor', {}).get('name')
+        })
+
+        # Breakdown counts
+        resource_types = {}
+        repositories = {}
+        for sub in approved_submissions + community_submissions:
+            rt = sub.get('resourceType', 'Unknown')
+            repo = sub.get('repository', 'Unknown')
+            resource_types[rt] = resource_types.get(rt, 0) + 1
+            repositories[repo] = repositories.get(repo, 0) + 1
+
+        return {
+            'dandiset_id': dandiset_id,
+            'display_id': display_id,
+            'approved_count': approved_count,
+            'pending_count': pending_count,
+            'total_count': total_count,
+            'unique_contributors': unique_contributors,
+            'resource_types': resource_types,
+            'repositories': repositories
+        }

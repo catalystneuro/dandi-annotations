@@ -237,40 +237,64 @@ def dandiset_resources(dandiset_id):
         approved_page = request.args.get('approved_page', 1, type=int)
         community_page = request.args.get('community_page', 1, type=int)
         per_page = 9  # 9 resources per page for 3x3 grid
-        
+
+        api_base = request.host_url.rstrip('/')
+
+        # Always get overview for counts and context
+        overview_resp = requests.get(f"{api_base}/api/dandiset/{dandiset_id}/overview", timeout=5)
+        overview_resp.raise_for_status()
+        overview_data = overview_resp.json().get('data', {}) if overview_resp.headers.get('Content-Type', '').startswith('application/json') else overview_resp.json()
+
         # Always get approved submissions
-        approved_submissions, approved_pagination = submission_handler.get_approved_submissions_paginated(
-            dandiset_id, approved_page, per_page)
-        
-        # Always get community submission counts, but only get actual data for authenticated moderators
-        if auth_manager.is_authenticated():
-            # Moderators get full community submissions data
-            community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
-                dandiset_id, community_page, per_page)
+        approved_resp = requests.get(
+            f"{api_base}/api/dandiset/{dandiset_id}/approved",
+            params={'page': approved_page, 'per_page': per_page},
+            timeout=5
+        )
+        approved_resp.raise_for_status()
+        approved_json = approved_resp.json()
+        approved_submissions = approved_json.get('data', [])
+        approved_pagination = approved_json.get('pagination', {'page': approved_page, 'per_page': per_page})
+
+        # For community submissions: only moderators get actual data
+        if auth_manager.is_moderator():
+            community_resp = requests.get(
+                f"{api_base}/api/dandiset/{dandiset_id}/community",
+                params={'page': community_page, 'per_page': per_page},
+                cookies=request.cookies,  # forward session cookie for auth
+                timeout=5
+            )
+            community_resp.raise_for_status()
+            community_json = community_resp.json()
+            community_submissions = community_json.get('data', [])
+            community_pagination = community_json.get('pagination', {'page': community_page, 'per_page': per_page})
         else:
-            # Public users get counts only, no actual submission data
-            all_community_submissions = submission_handler.get_community_submissions(dandiset_id)
+            # Public or non-moderator users: show counts only, no actual data
+            pending_count = overview_data.get('pending_count', 0)
             community_submissions = []
             community_pagination = {
-                'page': 1, 'per_page': per_page, 'total_items': len(all_community_submissions), 'total_pages': 1,
-                'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
-                'start_item': 0, 'end_item': 0
+                'page': 1,
+                'per_page': per_page,
+                'total_items': pending_count,
+                'total_pages': 1,
+                'has_prev': False,
+                'has_next': False,
+                'prev_page': None,
+                'next_page': None,
+                'start_item': 0,
+                'end_item': 0
             }
-        
-        # Get all dandisets for navigation
-        all_dandisets = submission_handler.get_all_dandisets()
-        
+
         # Format display ID as DANDI:XXXXXX
         display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-        
+
         return render_template('dandiset_resources.html',
-                             dandiset_id=dandiset_id,
-                             display_id=display_id,
-                             community_submissions=community_submissions,
-                             approved_submissions=approved_submissions,
-                             community_pagination=community_pagination,
-                             approved_pagination=approved_pagination,
-                             all_dandisets=all_dandisets)
+                               dandiset_id=dandiset_id,
+                               display_id=display_id,
+                               community_submissions=community_submissions,
+                               approved_submissions=approved_submissions,
+                               community_pagination=community_pagination,
+                               approved_pagination=approved_pagination)
     except Exception as e:
         flash(f'Error loading resources: {str(e)}', 'error')
         return redirect(url_for('index'))
