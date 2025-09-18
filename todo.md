@@ -25,3 +25,5 @@
 - Repository tests for storage and retrieval logic
 - Service tests for business logic and error handling
 - App tests for end-to-end API functionality
+
+6) Split get_user_submissions into community-only and approved-only sub-methods

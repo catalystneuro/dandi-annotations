@@ -1,15 +1,3 @@
-"""
-ResourceRepository: standalone replacement for the old SubmissionHandler.
-
-This class is a drop-in replacement that implements the same behavior
-as the previous SubmissionHandler but without referencing it. It
-operates directly on the filesystem under a base submissions directory,
-using YAML files to store submissions.
-
-Methods mirror the original implementation so existing callers in the
-app can continue to work while we incrementally move logic into the
-service layer.
-"""
 import os
 import yaml
 import shutil
@@ -203,34 +191,6 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error approving submission: {str(e)}")
 
-    def get_all_pending_submissions(self) -> List[Dict[str, Any]]:
-        """
-        Get all pending community submissions across all dandisets
-
-        Returns:
-            List of all community submissions with dandiset info
-        """
-        try:
-            all_submissions = []
-
-            # Iterate through all dandiset directories
-            for dandiset_dir in self.base_dir.iterdir():
-                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
-                    dandiset_id = dandiset_dir.name
-                    community_submissions = self.get_community_submissions(dandiset_id)
-
-                    # Add dandiset info to each submission
-                    for submission in community_submissions:
-                        submission['_dandiset_id'] = dandiset_id
-                        all_submissions.append(submission)
-
-            # Sort by annotation_date (newest first)
-            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
-            return all_submissions
-
-        except Exception as e:
-            raise Exception(f"Error loading all pending submissions: {str(e)}")
-
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = 'community') -> Optional[Dict[str, Any]]:
         """
         Get a specific submission by filename
@@ -307,50 +267,6 @@ class ResourceRepository:
 
         return paginated_items, pagination_info
 
-    def get_community_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Get paginated community submissions for a dandiset
-
-        Args:
-            dandiset_id: The dandiset identifier
-            page: Current page number (1-based)
-            per_page: Number of submissions per page
-
-        Returns:
-            Tuple of (paginated_submissions, pagination_info)
-        """
-        all_submissions = self.get_community_submissions(dandiset_id)
-        return self._paginate_list(all_submissions, page, per_page)
-
-    def get_approved_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Get paginated approved submissions for a dandiset
-
-        Args:
-            dandiset_id: The dandiset identifier
-            page: Current page number (1-based)
-            per_page: Number of submissions per page
-
-        Returns:
-            Tuple of (paginated_submissions, pagination_info)
-        """
-        all_submissions = self.get_approved_submissions(dandiset_id)
-        return self._paginate_list(all_submissions, page, per_page)
-
-    def get_all_pending_submissions_paginated(self, page: int = 1, per_page: int = 9) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Get paginated pending community submissions across all dandisets
-
-        Args:
-            page: Current page number (1-based)
-            per_page: Number of submissions per page
-
-        Returns:
-            Tuple of (paginated_submissions, pagination_info)
-        """
-        all_submissions = self.get_all_pending_submissions()
-        return self._paginate_list(all_submissions, page, per_page)
-
     def get_user_submissions(self, user_email: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
         Get all submissions (community and approved) for a specific user
@@ -414,102 +330,6 @@ class ResourceRepository:
         approved_paginated, approved_pagination = self._paginate_list(approved_submissions, approved_page, per_page)
 
         return community_paginated, community_pagination, approved_paginated, approved_pagination
-
-    def get_dandiset(self, dandiset_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a specific dandiset by ID
-
-        Args:
-            dandiset_id: The dandiset identifier
-
-        Returns:
-            Dandiset info dict or None if not found
-        """
-        try:
-            all_dandisets = self.get_all_dandisets()
-            for dandiset in all_dandisets:
-                if dandiset.get('id') == dandiset_id:
-                    return dandiset
-            return None
-        except Exception as e:
-            raise Exception(f"Error retrieving dandiset {dandiset_id}: {str(e)}")
-
-    def get_resource_by_id(self, resource_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a specific resource by ID across all dandisets
-
-        Args:
-            resource_id: The resource identifier (filename without .yaml extension)
-
-        Returns:
-            Resource data dict or None if not found
-        """
-        try:
-            # Search through all dandisets for this resource
-            all_dandisets = self.get_all_dandisets()
-
-            for dandiset in all_dandisets:
-                dandiset_id = dandiset['id']
-
-                # Check approved submissions
-                approved_submissions = self.get_approved_submissions(dandiset_id)
-                for submission in approved_submissions:
-                    if submission.get('_submission_filename', '').replace('.yaml', '') == resource_id:
-                        return submission
-
-                # Check community submissions
-                community_submissions = self.get_community_submissions(dandiset_id)
-                for submission in community_submissions:
-                    if submission.get('_submission_filename', '').replace('.yaml', '') == resource_id:
-                        return submission
-
-            return None
-        except Exception as e:
-            raise Exception(f"Error retrieving resource {resource_id}: {str(e)}")
-
-    def get_all_submissions(self, dandiset_id: str, include_community: bool = True) -> List[Dict[str, Any]]:
-        """
-        Get all submissions (approved + community) for a dandiset
-
-        Args:
-            dandiset_id: The dandiset identifier
-            include_community: Whether to include community submissions
-
-        Returns:
-            List of all submission data
-        """
-        try:
-            # Get approved submissions
-            approved_submissions = self.get_approved_submissions(dandiset_id)
-
-            # Get community submissions if requested
-            community_submissions = []
-            if include_community:
-                community_submissions = self.get_community_submissions(dandiset_id)
-
-            # Combine and sort by annotation_date (newest first)
-            all_submissions = approved_submissions + community_submissions
-            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
-
-            return all_submissions
-        except Exception as e:
-            raise Exception(f"Error retrieving all submissions for dandiset {dandiset_id}: {str(e)}")
-
-    def get_all_submissions_paginated(self, dandiset_id: str, page: int = 1, per_page: int = 10, include_community: bool = True) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Get paginated submissions (approved + community) for a dandiset
-
-        Args:
-            dandiset_id: The dandiset identifier
-            page: Current page number (1-based)
-            per_page: Number of submissions per page
-            include_community: Whether to include community submissions
-
-        Returns:
-            Tuple of (paginated_submissions, pagination_info)
-        """
-        all_submissions = self.get_all_submissions(dandiset_id, include_community)
-        return self._paginate_list(all_submissions, page, per_page)
 
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
