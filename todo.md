@@ -29,3 +29,5 @@
 6) Split get_user_submissions into community-only and approved-only sub-methods
 
 7) Remove excessive try-except blocks
+
+8) Clarify naming: resource vs submission, pending vs community
