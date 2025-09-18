@@ -193,8 +193,64 @@ class ResourceRepository:
 
         except Exception as e:
             raise Exception(f"Error deleting submission: {str(e)}")
-    
-    def get_community_submissions(self, dandiset_id: str) -> List[Dict[str, Any]]:
+     
+    def get_community_submissions(self) -> List[Dict[str, Any]]:
+        """
+        Get all pending (community) submissions across all dandisets.
+
+        Returns:
+            List of all community submissions with dandiset info
+        """
+        try:
+            all_submissions: List[Dict[str, Any]] = []
+
+            # Iterate through all dandiset directories
+            for dandiset_dir in self.base_dir.iterdir():
+                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                    dandiset_id = dandiset_dir.name
+                    community_submissions = self.get_community_submissions_by_dandiset(dandiset_id)
+
+                    # Add dandiset info to each submission
+                    for submission in community_submissions:
+                        submission['_dandiset_id'] = dandiset_id
+                        all_submissions.append(submission)
+
+            # Sort by annotation_date (newest first)
+            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            return all_submissions
+
+        except Exception as e:
+            raise Exception(f"Error loading all community submissions: {str(e)}")
+
+    def get_approved_submissions(self) -> List[Dict[str, Any]]:
+        """
+        Get all approved submissions across all dandisets.
+
+        Returns:
+            List of all approved submissions with dandiset info
+        """
+        try:
+            all_submissions: List[Dict[str, Any]] = []
+
+            # Iterate through all dandiset directories
+            for dandiset_dir in self.base_dir.iterdir():
+                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                    dandiset_id = dandiset_dir.name
+                    approved_submissions = self.get_approved_submissions_by_dandiset(dandiset_id)
+
+                    # Add dandiset info to each submission
+                    for submission in approved_submissions:
+                        submission['_dandiset_id'] = dandiset_id
+                        all_submissions.append(submission)
+
+            # Sort by annotation_date (newest first)
+            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            return all_submissions
+
+        except Exception as e:
+            raise Exception(f"Error loading all approved submissions: {str(e)}")
+
+    def get_community_submissions_by_dandiset(self, dandiset_id: str) -> List[Dict[str, Any]]:
         """
         Get all community submissions for a dandiset
 
@@ -227,7 +283,7 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error loading community submissions: {str(e)}")
 
-    def get_approved_submissions(self, dandiset_id: str) -> List[Dict[str, Any]]:
+    def get_approved_submissions_by_dandiset(self, dandiset_id: str) -> List[Dict[str, Any]]:
         """
         Get all approved submissions for a dandiset
 
@@ -259,62 +315,6 @@ class ResourceRepository:
             return submissions
         except Exception as e:
             raise Exception(f"Error loading approved submissions: {str(e)}")
-
-    def get_all_community_submissions(self) -> List[Dict[str, Any]]:
-        """
-        Get all pending (community) submissions across all dandisets.
-
-        Returns:
-            List of all community submissions with dandiset info
-        """
-        try:
-            all_submissions: List[Dict[str, Any]] = []
-
-            # Iterate through all dandiset directories
-            for dandiset_dir in self.base_dir.iterdir():
-                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
-                    dandiset_id = dandiset_dir.name
-                    community_submissions = self.get_community_submissions(dandiset_id)
-
-                    # Add dandiset info to each submission
-                    for submission in community_submissions:
-                        submission['_dandiset_id'] = dandiset_id
-                        all_submissions.append(submission)
-
-            # Sort by annotation_date (newest first)
-            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
-            return all_submissions
-
-        except Exception as e:
-            raise Exception(f"Error loading all community submissions: {str(e)}")
-
-    def get_all_approved_submissions(self) -> List[Dict[str, Any]]:
-        """
-        Get all approved submissions across all dandisets.
-
-        Returns:
-            List of all approved submissions with dandiset info
-        """
-        try:
-            all_submissions: List[Dict[str, Any]] = []
-
-            # Iterate through all dandiset directories
-            for dandiset_dir in self.base_dir.iterdir():
-                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
-                    dandiset_id = dandiset_dir.name
-                    approved_submissions = self.get_approved_submissions(dandiset_id)
-
-                    # Add dandiset info to each submission
-                    for submission in approved_submissions:
-                        submission['_dandiset_id'] = dandiset_id
-                        all_submissions.append(submission)
-
-            # Sort by annotation_date (newest first)
-            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
-            return all_submissions
-
-        except Exception as e:
-            raise Exception(f"Error loading all approved submissions: {str(e)}")
 
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = 'community') -> Optional[Dict[str, Any]]:
         """
@@ -351,7 +351,7 @@ class ResourceRepository:
             print(f"Error loading submission {filename}: {e}")
             return None
 
-    def get_user_community_submissions(self, user_email: str) -> List[Dict[str, Any]]:
+    def get_community_submissions_by_user(self, user_email: str) -> List[Dict[str, Any]]:
         """
         Get all community (pending) submissions for a specific user.
 
@@ -370,7 +370,7 @@ class ResourceRepository:
                     dandiset_id = dandiset_dir.name
 
                     # Get community submissions for this dandiset
-                    dandiset_community = self.get_community_submissions(dandiset_id)
+                    dandiset_community = self.get_community_submissions_by_dandiset(dandiset_id)
                     for submission in dandiset_community:
                         contributor_email = submission.get('annotation_contributor', {}).get('email', '')
                         if contributor_email == user_email:
@@ -384,7 +384,7 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error loading user community submissions: {str(e)}")
 
-    def get_user_approved_submissions(self, user_email: str) -> List[Dict[str, Any]]:
+    def get_approved_submissions_by_user(self, user_email: str) -> List[Dict[str, Any]]:
         """
         Get all approved submissions for a specific user.
 
@@ -403,7 +403,7 @@ class ResourceRepository:
                     dandiset_id = dandiset_dir.name
 
                     # Get approved submissions for this dandiset
-                    dandiset_approved = self.get_approved_submissions(dandiset_id)
+                    dandiset_approved = self.get_approved_submissions_by_dandiset(dandiset_id)
                     for submission in dandiset_approved:
                         contributor_email = submission.get('annotation_contributor', {}).get('email', '')
                         if contributor_email == user_email:

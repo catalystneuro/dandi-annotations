@@ -122,8 +122,8 @@ class ResourceService:
                 dandiset_id = dandiset_dir.name
 
                 # Count submissions via repository methods
-                community_count = len(self.repo.get_community_submissions(dandiset_id))
-                approved_count = len(self.repo.get_approved_submissions(dandiset_id))
+                community_count = len(self.repo.get_community_submissions_by_dandiset(dandiset_id))
+                approved_count = len(self.repo.get_approved_submissions_by_dandiset(dandiset_id))
                 total_count = community_count + approved_count
 
                 # Only include dandisets that have submissions
@@ -171,7 +171,7 @@ class ResourceService:
             contributor_names = set()
             for ds in all_dandisets:
                 if ds.get('community_count', 0) > 0:
-                    for sub in self.repo.get_community_submissions(ds['id']):
+                    for sub in self.repo.get_community_submissions_by_dandiset(ds['id']):
                         name = sub.get('annotation_contributor', {}).get('name')
                         if name:
                             contributor_names.add(name)
@@ -256,7 +256,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_approved_submissions(dandiset_id)
+        return self.repo.get_approved_submissions_by_dandiset(dandiset_id)
 
     @paginate
     def get_pending_resources(self, dandiset_id: str) -> List[Dict[str, Any]]:
@@ -265,7 +265,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_community_submissions(dandiset_id)
+        return self.repo.get_community_submissions_by_dandiset(dandiset_id)
 
     @paginate
     def get_all_approved_resources(self) -> List[Dict[str, Any]]:
@@ -274,7 +274,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_all_approved_submissions()
+        return self.repo.get_approved_submissions()
 
     @paginate
     def get_all_pending_resources(self) -> List[Dict[str, Any]]:
@@ -283,7 +283,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_all_community_submissions()
+        return self.repo.get_community_submissions()
 
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = "community") -> Optional[Dict[str, Any]]:
         """
@@ -475,7 +475,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_user_community_submissions(user_email)
+        return self.repo.get_community_submissions_by_user(user_email)
 
     @paginate
     def get_user_approved_resources(self, user_email: str) -> List[Dict[str, Any]]:
@@ -484,7 +484,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_user_approved_submissions(user_email)
+        return self.repo.get_approved_submissions_by_user(user_email)
 
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
@@ -492,8 +492,8 @@ class ResourceService:
         Computed from approved + community lists to avoid brittle existence checks.
         """
         # Fetch lists using repository helpers (these tolerate missing dirs)
-        approved_submissions = self.repo.get_approved_submissions(dandiset_id)
-        community_submissions = self.repo.get_community_submissions(dandiset_id)
+        approved_submissions = self.repo.get_approved_submissions_by_dandiset(dandiset_id)
+        community_submissions = self.repo.get_community_submissions_by_dandiset(dandiset_id)
 
         # Build display ID
         display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
