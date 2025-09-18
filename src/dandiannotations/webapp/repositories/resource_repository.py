@@ -331,55 +331,6 @@ class ResourceRepository:
 
         return community_paginated, community_pagination, approved_paginated, approved_pagination
 
-    def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
-        """
-        Get detailed statistics for a specific dandiset
-
-        Args:
-            dandiset_id: The dandiset identifier
-
-        Returns:
-            Dictionary with detailed dandiset statistics
-        """
-        try:
-            # Get dandiset information
-            dandiset_info = self.get_dandiset(dandiset_id)
-            if not dandiset_info:
-                raise Exception(f"Dandiset {dandiset_id} not found")
-
-            # Get detailed submissions for analysis
-            approved_submissions = self.get_approved_submissions(dandiset_id)
-            community_submissions = self.get_community_submissions(dandiset_id)
-
-            # Calculate detailed statistics
-            stats = {
-                'dandiset_id': dandiset_id,
-                'display_id': f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}",
-                'approved_count': len(approved_submissions),
-                'pending_count': len(community_submissions),
-                'total_count': len(approved_submissions) + len(community_submissions),
-                'unique_contributors': len(set(
-                    submission.get('annotation_contributor', {}).get('name')
-                    for submission in approved_submissions + community_submissions
-                    if submission.get('annotation_contributor', {}).get('name')
-                )),
-                'resource_types': {},
-                'repositories': {}
-            }
-
-            # Analyze resource types and repositories
-            all_submissions = approved_submissions + community_submissions
-            for submission in all_submissions:
-                resource_type = submission.get('resourceType', 'Unknown')
-                repository = submission.get('repository', 'Unknown')
-
-                stats['resource_types'][resource_type] = stats['resource_types'].get(resource_type, 0) + 1
-                stats['repositories'][repository] = stats['repositories'].get(repository, 0) + 1
-
-            return stats
-        except Exception as e:
-            raise Exception(f"Error calculating dandiset statistics: {str(e)}")
-
     def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
         """
         Delete a submission and move it to backup folder with audit trail
