@@ -61,6 +61,43 @@ def get_submission(dandiset_id, filename):
         return not_found_response("Submission")
 
 
+@moderation_api_bp.route("/submissions/<dandiset_id>/<filename>", methods=["DELETE"])
+@handle_api_errors("Failed to delete submission")
+def delete_submission(dandiset_id, filename):
+    """
+    DELETE /api/moderation/submissions/{dandiset_id}/{filename}?status=community|approved
+    Thin route: auth + minimal HTTP checks; service handles validation and deletion.
+    """
+    # Check moderator privileges
+    auth_error = auth_manager.require_moderator()
+    if auth_error:
+        if auth_error["status_code"] == 401:
+            return unauthorized_response(auth_error["error"])
+        else:
+            return forbidden_response(auth_error["error"])
+
+    # Read status from query parameter (required); service will validate value
+    status = (request.args.get("status") or "").strip().lower()
+
+    # Minimal HTTP checks (content type + JSON presence for moderator info)
+    is_valid, error_msg = validate_content_type()
+    if not is_valid:
+        return validation_error_response(error_msg)
+    is_valid, error_msg = validate_json_request()
+    if not is_valid:
+        return validation_error_response(error_msg)
+
+    data = request.get_json() or {}
+    try:
+        result = resource_service.delete_submission(dandiset_id, filename, status, data)
+        name = result.get("resource_name", filename)
+        return success_response(data=result, message=f"Submission '{name}' deleted successfully")
+    except ValueError as e:
+        return validation_error_response(str(e))
+    except FileNotFoundError:
+        return not_found_response("Submission")
+
+
 @moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/approve", methods=["POST"])
 @handle_api_errors("Failed to approve submission")
 def approve_submission(dandiset_id, filename):

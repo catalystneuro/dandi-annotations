@@ -387,6 +387,69 @@ class ResourceService:
         approved = self.repo.get_submission_by_filename(dandiset_id, filename, "approved")
         return self._serialize_resource(approved)
 
+    def delete_submission(self, dandiset_id: str, filename: str, status: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Delete a submission (community or approved) and return a deletion summary.
+
+        Args:
+            dandiset_id: Dandiset identifier (may be 'dandiset_XXXXXX' or 'XXXXXX')
+            filename: Submission filename to delete
+            status: 'community' or 'approved'
+            data: JSON payload containing moderator info:
+                  - moderator_name (required)
+                  - moderator_email (required)
+                  - moderator_identifier (optional)
+                  - moderator_url (optional)
+
+        Returns:
+            Dict with deletion summary fields:
+              - dandiset_id, filename, status, resource_name, deleted_by, deletion_date (ISO)
+        """
+        # Basic input checks
+        self._validate_dandiset_id(dandiset_id)
+        status_norm = (status or '').strip().lower()
+        if status_norm not in {'community', 'approved'}:
+            raise ValueError("Status parameter must be 'community' or 'approved'")
+
+        name = (data or {}).get('moderator_name', '').strip()
+        email = (data or {}).get('moderator_email', '').strip()
+        identifier = (data or {}).get('moderator_identifier', '').strip() if data else None
+        url_field = (data or {}).get('moderator_url', '').strip() if data else None
+
+        if not name:
+            raise ValueError("Moderator name is required")
+        self._validate_email(email)
+        self._validate_orcid(identifier)
+        self._validate_url(url_field)
+
+        moderator_info = {'name': name, 'email': email}
+        if identifier:
+            moderator_info['identifier'] = identifier
+        if url_field:
+            moderator_info['url'] = url_field
+
+        # Load submission pre-delete to capture resource_name
+        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status_norm)
+        if not submission:
+            raise FileNotFoundError("Submission not found")
+
+        resource_name = submission.get('name', filename)
+
+        # Delegate deletion to repository (moves to backup and deletes original)
+        success = self.repo.delete_submission(dandiset_id, filename, status_norm, moderator_info)
+        if not success:
+            raise Exception("Deletion failed")
+
+        deletion_date = datetime.now().astimezone().isoformat()
+        return {
+            'dandiset_id': dandiset_id,
+            'filename': filename,
+            'status': status_norm,
+            'resource_name': resource_name,
+            'deleted_by': name,
+            'deletion_date': deletion_date,
+        }
+
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
         Return detailed statistics for a specific dandiset.
