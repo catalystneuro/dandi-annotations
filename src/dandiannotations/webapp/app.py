@@ -12,7 +12,6 @@ import requests
 # Add the parent directory to the path to import our models
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from dandiannotations.webapp.utils.yaml_handler import YAMLHandler
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
 from dandiannotations.webapp.utils.schema_utils import get_resource_relation_options, get_resource_type_options
@@ -70,10 +69,6 @@ def handle_500(error):
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'submissions')
 resource_repository = ResourceRepository(SUBMISSIONS_DIR)
 resource_service = ResourceService(resource_repository)
-
-# Keep old YAML handler for backward compatibility if needed
-YAML_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'external_resources', 'external_resources.yaml')
-yaml_handler = YAMLHandler(YAML_FILE_PATH)
 
 # Authentication configuration
 MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config', 'moderators.yaml')
