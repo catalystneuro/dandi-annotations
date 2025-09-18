@@ -613,34 +613,68 @@ def register():
 @app.route('/my-submissions')
 @login_required
 def my_submissions():
-    """Display current user's submissions"""
+    """Display current user's submissions via the new API"""
     try:
         current_user = auth_manager.get_current_user()
         if not current_user:
             flash('You must be logged in to view your submissions', 'error')
             return redirect(url_for('login'))
-        
+
         user_email = current_user['email']
-        
-        # Get pagination parameters
+
+        # Pagination parameters
         community_page = request.args.get('community_page', 1, type=int)
         approved_page = request.args.get('approved_page', 1, type=int)
-        per_page = 9  # 9 submissions per page for 3x3 grid
-        
-        # Get paginated user submissions
-        community_submissions, community_pagination, approved_submissions, approved_pagination = \
-            submission_handler.get_user_submissions_paginated(user_email, community_page, approved_page, per_page)
-        
-        # Get all dandisets for navigation
-        all_dandisets = submission_handler.get_all_dandisets()
-        
+        per_page = request.args.get('per_page', 9, type=int)
+
+        api_base = request.host_url.rstrip('/')
+
+        # Call the new API endpoint for user submissions
+        resp = requests.get(
+            f"{api_base}/api/submissions/user/{user_email}",
+            params={
+                'community_page': community_page,
+                'approved_page': approved_page,
+                'per_page': per_page
+            },
+            cookies=request.cookies,
+            timeout=10
+        )
+
+        if resp.status_code != 200:
+            try:
+                err_json = resp.json()
+                if 'error' in err_json:
+                    msg = err_json['error'].get('message', f"Status {resp.status_code}")
+                else:
+                    msg = f"Status {resp.status_code}"
+            except Exception:
+                msg = f"Status {resp.status_code}"
+            flash(f'Error loading your submissions: {msg}', 'error')
+            return redirect(url_for('index'))
+
+        data = resp.json().get('data', {})
+        community_submissions = data.get('community_submissions', [])
+        approved_submissions = data.get('approved_submissions', [])
+        community_pagination = data.get('community_pagination', {'page': community_page, 'per_page': per_page})
+        approved_pagination = data.get('approved_pagination', {'page': approved_page, 'per_page': per_page})
+
+        # Build list of all dandisets for navigation based on submissions returned
+        # Fallback to unique dandiset ids from the submissions
+        all_ids = set()
+        for sub in community_submissions + approved_submissions:
+            did = sub.get('_dandiset_id') or sub.get('dandiset_id')
+            if did:
+                all_ids.add(did)
+        all_dandisets = [{'id': did, 'display_id': f"DANDI:{did.split('_')[1]}" if '_' in did else f"DANDI:{str(did).zfill(6)}"} for did in sorted(all_ids)]
+
         return render_template('my_submissions.html',
-                             community_submissions=community_submissions,
-                             approved_submissions=approved_submissions,
-                             community_pagination=community_pagination,
-                             approved_pagination=approved_pagination,
-                             all_dandisets=all_dandisets,
-                             user_email=user_email)
+                               community_submissions=community_submissions,
+                               approved_submissions=approved_submissions,
+                               community_pagination=community_pagination,
+                               approved_pagination=approved_pagination,
+                               all_dandisets=all_dandisets,
+                               user_email=user_email)
     except Exception as e:
         flash(f'Error loading your submissions: {str(e)}', 'error')
         return redirect(url_for('index'))

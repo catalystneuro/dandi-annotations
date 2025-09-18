@@ -450,6 +450,20 @@ class ResourceService:
             'deletion_date': deletion_date,
         }
 
+    def get_user_submissions_paginated(self, user_email: str, community_page: int = 1, approved_page: int = 1, per_page: int = 9) -> Dict[str, Any]:
+        """
+        Return current user's submissions (community and approved) with pagination metadata.
+        """
+        community_submissions, community_pagination, approved_submissions, approved_pagination = \
+            self.repo.get_user_submissions_paginated(user_email, community_page, approved_page, per_page)
+
+        return {
+            'community_submissions': community_submissions,
+            'approved_submissions': approved_submissions,
+            'community_pagination': community_pagination,
+            'approved_pagination': approved_pagination,
+        }
+
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
         Return detailed statistics for a specific dandiset.
