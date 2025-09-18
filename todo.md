@@ -18,3 +18,10 @@
 - Legacy Endpoints in routes.py
 - Unused methods in resource_repository.py
 - duplicate validation and serialization logic
+
+5) Add Tests
+- Unit tests for Pydantic models (validation and serialization)
+- Integration tests for services and routes
+- Repository tests for storage and retrieval logic
+- Service tests for business logic and error handling
+- App tests for end-to-end API functionality
