@@ -624,35 +624,57 @@ def my_submissions():
 
         api_base = request.host_url.rstrip('/')
 
-        # Call the new API endpoint for user submissions
-        resp = requests.get(
-            f"{api_base}/api/submissions/user/{user_email}",
+        # Call the split API endpoints for user submissions
+        community_resp = requests.get(
+            f"{api_base}/api/submissions/user/{user_email}/community",
             params={
-                'community_page': community_page,
-                'approved_page': approved_page,
+                'page': community_page,
+                'per_page': per_page
+            },
+            cookies=request.cookies,
+            timeout=10
+        )
+        approved_resp = requests.get(
+            f"{api_base}/api/submissions/user/{user_email}/approved",
+            params={
+                'page': approved_page,
                 'per_page': per_page
             },
             cookies=request.cookies,
             timeout=10
         )
 
-        if resp.status_code != 200:
+        # Handle errors
+        if community_resp.status_code != 200:
             try:
-                err_json = resp.json()
+                err_json = community_resp.json()
                 if 'error' in err_json:
-                    msg = err_json['error'].get('message', f"Status {resp.status_code}")
+                    msg = err_json['error'].get('message', f"Status {community_resp.status_code}")
                 else:
-                    msg = f"Status {resp.status_code}"
+                    msg = f"Status {community_resp.status_code}"
             except Exception:
-                msg = f"Status {resp.status_code}"
-            flash(f'Error loading your submissions: {msg}', 'error')
+                msg = f"Status {community_resp.status_code}"
+            flash(f'Error loading your community submissions: {msg}', 'error')
             return redirect(url_for('index'))
 
-        data = resp.json().get('data', {})
-        community_submissions = data.get('community_submissions', [])
-        approved_submissions = data.get('approved_submissions', [])
-        community_pagination = data.get('community_pagination', {'page': community_page, 'per_page': per_page})
-        approved_pagination = data.get('approved_pagination', {'page': approved_page, 'per_page': per_page})
+        if approved_resp.status_code != 200:
+            try:
+                err_json = approved_resp.json()
+                if 'error' in err_json:
+                    msg = err_json['error'].get('message', f"Status {approved_resp.status_code}")
+                else:
+                    msg = f"Status {approved_resp.status_code}"
+            except Exception:
+                msg = f"Status {approved_resp.status_code}"
+            flash(f'Error loading your approved submissions: {msg}', 'error')
+            return redirect(url_for('index'))
+
+        community_json = community_resp.json()
+        approved_json = approved_resp.json()
+        community_submissions = community_json.get('data', [])
+        approved_submissions = approved_json.get('data', [])
+        community_pagination = community_json.get('pagination', {'page': community_page, 'per_page': per_page})
+        approved_pagination = approved_json.get('pagination', {'page': approved_page, 'per_page': per_page})
 
         # Build list of all dandisets for navigation based on submissions returned
         # Fallback to unique dandiset ids from the submissions

@@ -27,16 +27,15 @@ MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config",
 auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
 
 
-@user_api_bp.route("/user/<user_email>", methods=["GET"])
-@handle_api_errors("Failed to retrieve user submissions")
-def get_user_submissions(user_email):
+@user_api_bp.route("/user/<user_email>/community", methods=["GET"])
+@handle_api_errors("Failed to retrieve user community submissions")
+def get_user_community_submissions(user_email):
     """
-    GET /api/submissions/user/{user_email}
-    Return the current user's submissions (authentication required).
+    GET /api/submissions/user/{user_email}/community
+    Return the current user's community (pending) submissions (authentication required).
     Users can only view their own submissions.
     Query params:
-      - community_page (int, default 1)
-      - approved_page (int, default 1)
+      - page (int, default 1)
       - per_page (int, default 10)
     """
     # Require authentication
@@ -48,28 +47,63 @@ def get_user_submissions(user_email):
     if not current_user or current_user.get("email") != user_email:
         return forbidden_response("You can only view your own submissions")
 
-    # Parse pagination params (simple typing; service returns pagination metadata)
-    community_page = request.args.get("community_page", default=1, type=int)
-    approved_page = request.args.get("approved_page", default=1, type=int)
+    # Parse pagination params
+    page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=10, type=int)
 
     # Basic bounds checks
-    if community_page < 1 or approved_page < 1 or per_page < 1:
+    if page < 1 or per_page < 1:
         return validation_error_response("Pagination parameters must be >= 1")
 
-    result = resource_service.get_user_submissions_paginated(
+    items, pagination = resource_service.get_user_pending_resources(
         user_email=user_email,
-        community_page=community_page,
-        approved_page=approved_page,
+        page=page,
         per_page=per_page,
     )
 
     return success_response(
-        data={
-            "community_submissions": result["community_submissions"],
-            "approved_submissions": result["approved_submissions"],
-            "community_pagination": result["community_pagination"],
-            "approved_pagination": result["approved_pagination"],
-        },
-        message="User submissions retrieved successfully",
+        data=items,
+        pagination=pagination,
+        message="User community submissions retrieved successfully",
+    )
+
+
+@user_api_bp.route("/user/<user_email>/approved", methods=["GET"])
+@handle_api_errors("Failed to retrieve user approved submissions")
+def get_user_approved_submissions(user_email):
+    """
+    GET /api/submissions/user/{user_email}/approved
+    Return the current user's approved submissions (authentication required).
+    Users can only view their own submissions.
+    Query params:
+      - page (int, default 1)
+      - per_page (int, default 10)
+    """
+    # Require authentication
+    auth_error = auth_manager.require_authentication()
+    if auth_error:
+        return unauthorized_response(auth_error["error"])
+
+    current_user = auth_manager.get_current_user()
+    if not current_user or current_user.get("email") != user_email:
+        return forbidden_response("You can only view your own submissions")
+
+    # Parse pagination params
+    page = request.args.get("page", default=1, type=int)
+    per_page = request.args.get("per_page", default=10, type=int)
+
+    # Basic bounds checks
+    if page < 1 or per_page < 1:
+        return validation_error_response("Pagination parameters must be >= 1")
+
+    items, pagination = resource_service.get_user_approved_resources(
+        user_email=user_email,
+        page=page,
+        per_page=per_page,
+    )
+
+    return success_response(
+        data=items,
+        pagination=pagination,
+        message="User approved submissions retrieved successfully",
     )

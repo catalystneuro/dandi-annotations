@@ -468,19 +468,23 @@ class ResourceService:
             'deletion_date': deletion_date,
         }
 
-    def get_user_submissions_paginated(self, user_email: str, community_page: int = 1, approved_page: int = 1, per_page: int = 9) -> Dict[str, Any]:
+    @paginate
+    def get_user_pending_resources(self, user_email: str) -> List[Dict[str, Any]]:
         """
-        Return current user's submissions (community and approved) with pagination metadata.
-        """
-        community_submissions, community_pagination, approved_submissions, approved_pagination = \
-            self.repo.get_user_submissions_paginated(user_email, community_page, approved_page, per_page)
+        Return pending (community) resources for a user.
 
-        return {
-            'community_submissions': community_submissions,
-            'approved_submissions': approved_submissions,
-            'community_pagination': community_pagination,
-            'approved_pagination': approved_pagination,
-        }
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        return self.repo.get_user_community_submissions(user_email)
+
+    @paginate
+    def get_user_approved_resources(self, user_email: str) -> List[Dict[str, Any]]:
+        """
+        Return approved resources for a user.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        return self.repo.get_user_approved_submissions(user_email)
 
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
