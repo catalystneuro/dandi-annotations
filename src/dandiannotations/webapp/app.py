@@ -355,77 +355,116 @@ def moderate():
 @app.route('/approve/<dandiset_id>/<filename>', methods=['GET', 'POST'])
 @login_required
 def approve_submission(dandiset_id, filename):
-    """Approve a community submission"""
+    """Approve a community submission (UI endpoint combining GET and POST).
+
+    GET:
+    - Renders the moderation approval form for the specified submission.
+    - Requires authenticated moderator.
+    - Retrieves the pending submission via /api/moderation/submissions/{dandiset_id}/{filename}.
+    - Prefills moderator name/email from the current session.
+
+    POST:
+    - Submits approval for the specified submission.
+    - Requires authenticated moderator.
+    - Forwards JSON payload (moderator_name, moderator_email, optional identifier/url) to
+      /api/moderation/submissions/{dandiset_id}/{filename}/approve.
+    - Parses API response, flashes success/error, then redirects to /moderate.
+
+    Notes:
+    - This route is a thin UI orchestrator; all validation and side-effects live in the API.
+    """
+    # Enforce moderator role for both GET and POST
+    if not auth_manager.is_moderator():
+        flash('Access denied. Moderator privileges required.', 'error')
+        return redirect(url_for('index'))
+
+    api_base = request.host_url.rstrip('/')
+
     if request.method == 'GET':
-        # Show approval form
+        # GET: render approval form (fetches pending submission via moderation API)
         try:
-            submission = submission_handler.get_submission_by_filename(dandiset_id, filename, 'community')
-            if not submission:
-                flash('Submission not found', 'error')
+            resp = requests.get(
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}",
+                cookies=request.cookies,
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                submission = data.get('data', data)
+
+                # Ensure template compatibility: add _dandiset_id if only dandiset_id provided
+                if submission and '_dandiset_id' not in submission and 'dandiset_id' in submission:
+                    submission['_dandiset_id'] = submission['dandiset_id']
+
+                return render_template(
+                    'approve_form.html',
+                    submission=submission,
+                    dandiset_id=dandiset_id,
+                    filename=filename
+                )
+            else:
+                # Extract error message if available
+                try:
+                    err = resp.json().get('error', {})
+                    msg = err.get('message') or err or f"Status {resp.status_code}"
+                except Exception:
+                    msg = f"Status {resp.status_code}"
+                flash(f'Error loading submission: {msg}', 'error')
                 return redirect(url_for('moderate'))
-            
-            return render_template('approve_form.html',
-                                 submission=submission,
-                                 dandiset_id=dandiset_id,
-                                 filename=filename)
         except Exception as e:
             flash(f'Error loading submission: {str(e)}', 'error')
             return redirect(url_for('moderate'))
-    
+
     elif request.method == 'POST':
-        # Process approval
+        # POST: submit approval (forwards moderator info to moderation API)
         try:
-            # Get moderator information from form
-            moderator_info = {
-                'name': request.form.get('moderator_name', '').strip(),
-                'email': request.form.get('moderator_email', '').strip(),
-                'identifier': request.form.get('moderator_identifier', '').strip(),
-                'url': request.form.get('moderator_url', '').strip()
+            # Get moderator information from form (auto-filled from session)
+            name = request.form.get('moderator_name', '').strip()
+            email = request.form.get('moderator_email', '').strip()
+            identifier = request.form.get('moderator_identifier', '').strip()
+            url_field = request.form.get('moderator_url', '').strip()
+
+            # Minimal presence checks for UX; API performs canonical validation
+            if not name or not email:
+                flash('Moderator name and email are required', 'error')
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
+
+            payload = {
+                'moderator_name': name,
+                'moderator_email': email,
             }
-            
-            # Validate required moderator fields
-            if not moderator_info['name']:
-                flash('Moderator name is required', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            if not moderator_info['email']:
-                flash('Moderator email is required', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Validate email format
-            if not validate_email(moderator_info['email']):
-                flash('Invalid moderator email format', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Validate ORCID if provided
-            if moderator_info['identifier'] and not validate_orcid(moderator_info['identifier']):
-                flash('Invalid ORCID format', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Validate URL if provided
-            if moderator_info['url'] and not validate_url(moderator_info['url']):
-                flash('Invalid moderator URL format', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Remove empty fields
-            moderator_info = {k: v for k, v in moderator_info.items() if v}
-            
-            # Get submission details for better success message
-            submission = submission_handler.get_submission_by_filename(dandiset_id, filename, 'community')
-            
-            success = submission_handler.approve_submission(dandiset_id, filename, moderator_info)
-            if success:
-                if submission:
-                    resource_name = submission.get('name', 'Unknown Resource')
-                    display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-                    flash(f'Successfully approved "{resource_name}" for {display_id}', 'success')
-                else:
-                    flash(f'Successfully approved submission: {filename}', 'success')
+            if identifier:
+                payload['moderator_identifier'] = identifier
+            if url_field:
+                payload['moderator_url'] = url_field
+
+            resp = requests.post(
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/approve",
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                cookies=request.cookies,
+                timeout=10,
+            )
+
+            if resp.status_code == 200:
+                data = resp.json().get('data') if resp.headers.get('Content-Type', '').startswith('application/json') else None
+                resource_name = (data or {}).get('name', filename)
+                display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+                flash(f'Successfully approved "{resource_name}" for {display_id}', 'success')
             else:
-                flash(f'Failed to approve submission: {filename}', 'error')
+                try:
+                    err_json = resp.json()
+                    if 'error' in err_json:
+                        msg = err_json['error'].get('message', f"Status {resp.status_code}")
+                    else:
+                        msg = f"Status {resp.status_code}"
+                except Exception:
+                    msg = f"Status {resp.status_code}"
+                flash(f'Failed to approve submission: {msg}', 'error')
+
         except Exception as e:
             flash(f'Error approving submission: {str(e)}', 'error')
-        
+
         # Redirect back to moderation page
         return redirect(url_for('moderate'))
 

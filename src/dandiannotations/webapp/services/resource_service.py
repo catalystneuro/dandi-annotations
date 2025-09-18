@@ -267,6 +267,126 @@ class ResourceService:
         """
         return self.repo.get_community_submissions(dandiset_id)
 
+    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = "community") -> Optional[Dict[str, Any]]:
+        """
+        Retrieve a single submission by filename and status via the repository.
+        """
+        return self.repo.get_submission_by_filename(dandiset_id, filename, status)
+
+    # ---------------------------
+    # Validation helpers (service-layer validation)
+    # ---------------------------
+    def _validate_dandiset_id(self, dandiset_id: str) -> None:
+        """
+        Validate dandiset ID format: either 6 digits (000001) or 'dandiset_000001'.
+        Raises ValueError on invalid input.
+        """
+        if not dandiset_id:
+            raise ValueError("Dandiset ID is required")
+        pattern = r'^(dandiset_)?[0-9]{6}$'
+        if not re.match(pattern, dandiset_id):
+            raise ValueError("Invalid dandiset ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)")
+
+    def _validate_email(self, email: Optional[str]) -> None:
+        if not email:
+            raise ValueError("Moderator email is required")
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, email):
+            raise ValueError("Invalid moderator email format")
+
+    def _validate_url(self, url: Optional[str]) -> None:
+        if not url:
+            return
+        pattern = r'^https?://[^\s/$.?#].[^\s]*$'
+        if not re.match(pattern, url):
+            raise ValueError("Invalid moderator URL format. Must start with http:// or https://")
+
+    def _validate_orcid(self, orcid: Optional[str]) -> None:
+        if not orcid:
+            return
+        pattern = r'^https://orcid\.org/\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
+        if not re.match(pattern, orcid):
+            raise ValueError("Invalid moderator ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000")
+
+    # ---------------------------
+    # Serialization helper (service-layer serialization)
+    # ---------------------------
+    def _serialize_resource(self, resource: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Normalize a resource dict for API/UI consumption (lightweight serializer).
+        - Ensures dandiset_id key exists (from _dandiset_id)
+        - Adds id derived from filename if not present
+        """
+        if not resource:
+            return None
+        serialized = dict(resource)
+        if '_dandiset_id' in serialized and 'dandiset_id' not in serialized:
+            serialized['dandiset_id'] = serialized.get('_dandiset_id')
+        if '_submission_filename' in serialized and 'id' not in serialized:
+            try:
+                serialized['id'] = serialized['_submission_filename'].replace('.yaml', '')
+            except Exception:
+                pass
+        return serialized
+
+    # ---------------------------
+    # Moderation: GET pending submission (with validation + serialization)
+    # ---------------------------
+    def get_pending_submission(self, dandiset_id: str, filename: str) -> Optional[Dict[str, Any]]:
+        """
+        Validate input and return the pending (community) submission, serialized.
+        Returns None if not found.
+        Raises ValueError on validation failures.
+        """
+        self._validate_dandiset_id(dandiset_id)
+        submission = self.repo.get_submission_by_filename(dandiset_id, filename, "community")
+        return self._serialize_resource(submission)
+
+    def approve_submission(self, dandiset_id: str, filename: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate moderator payload, approve the pending submission, and return the approved record (serialized).
+
+        Expected data keys:
+          - moderator_name (required)
+          - moderator_email (required)
+          - moderator_identifier (optional)
+          - moderator_url (optional)
+        """
+        # Validate dandiset_id
+        self._validate_dandiset_id(dandiset_id)
+
+        # Extract and validate moderator fields
+        name = (data or {}).get('moderator_name', '').strip()
+        email = (data or {}).get('moderator_email', '').strip()
+        identifier = (data or {}).get('moderator_identifier', '').strip() if data else None
+        url_field = (data or {}).get('moderator_url', '').strip() if data else None
+
+        if not name:
+            raise ValueError("Moderator name is required")
+        self._validate_email(email)
+        self._validate_orcid(identifier)
+        self._validate_url(url_field)
+
+        moderator_info = {'name': name, 'email': email}
+        if identifier:
+            moderator_info['identifier'] = identifier
+        if url_field:
+            moderator_info['url'] = url_field
+
+        # Ensure the pending submission exists before attempting approval
+        pending = self.repo.get_submission_by_filename(dandiset_id, filename, "community")
+        if not pending:
+            # Let the route decide 404 vs 500 by raising FileNotFoundError
+            raise FileNotFoundError("Submission not found")
+
+        # Approve via repository
+        success = self.repo.approve_submission(dandiset_id, filename, moderator_info)
+        if not success:
+            raise Exception("Approval failed")
+
+        approved = self.repo.get_submission_by_filename(dandiset_id, filename, "approved")
+        return self._serialize_resource(approved)
+
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
         Return detailed statistics for a specific dandiset.
