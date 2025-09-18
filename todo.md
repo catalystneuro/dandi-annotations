@@ -13,3 +13,8 @@
 - Expose a stable resource_id at API/service layers
 - Repository handles filename/storage mapping internally
 - Migrate endpoints/templates to use resource_id; keep filename-based paths temporarily for compatibility and deprecate later
+
+4) Remove Redundant Code
+- Legacy Endpoints in routes.py
+- Unused methods in resource_repository.py
+- duplicate validation and serialization logic
