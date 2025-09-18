@@ -61,6 +61,66 @@ def get_submission(dandiset_id, filename):
         return not_found_response("Submission")
 
 
+@moderation_api_bp.route("/submissions/pending", methods=["GET"])
+@handle_api_errors("Failed to retrieve pending submissions")
+def get_all_pending_submissions():
+    """
+    GET /api/moderation/submissions/pending
+    Get all pending submissions across all dandisets (moderator only)
+    """
+    # Check moderator privileges
+    auth_error = auth_manager.require_moderator()
+    if auth_error:
+        if auth_error["status_code"] == 401:
+            return unauthorized_response(auth_error["error"])
+        else:
+            return forbidden_response(auth_error["error"])
+
+    # Pagination params
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 10, type=int)
+
+    # Fetch data via service
+    items, pagination = resource_service.get_all_pending_resources(page=page, per_page=per_page)
+
+    return success_response(
+        data=items,
+        message="Pending submissions retrieved successfully",
+        pagination=pagination
+    )
+
+
+@moderation_api_bp.route("/submissions/approved", methods=["GET"])
+@handle_api_errors("Failed to retrieve approved submissions")
+def get_all_approved_submissions():
+    """
+    GET /api/moderation/submissions/approved
+    Get all approved submissions across all dandisets (moderator only)
+    """
+    # Check moderator privileges
+    auth_error = auth_manager.require_moderator()
+    if auth_error:
+        if auth_error["status_code"] == 401:
+            return unauthorized_response(auth_error["error"])
+        else:
+            return forbidden_response(auth_error["error"])
+
+    # Pagination params (passed through; validated downstream)
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 10, type=int)
+
+    # Fetch data via service (@paginate provides items, pagination)
+    items, pagination = resource_service.get_all_approved_resources(
+        page=page, per_page=per_page
+    )
+
+    return success_response(
+        data=items,
+        message="Approved submissions retrieved successfully",
+        pagination=pagination
+    )
+
+
 @moderation_api_bp.route("/submissions/<dandiset_id>/<filename>", methods=["DELETE"])
 @handle_api_errors("Failed to delete submission")
 def delete_submission(dandiset_id, filename):

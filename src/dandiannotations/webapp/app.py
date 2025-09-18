@@ -316,7 +316,7 @@ def moderate():
 
         # Fetch paginated pending submissions for grid (moderator-only)
         resp = requests.get(
-            f"{api_base}/api/submissions/pending",
+            f"{api_base}/api/moderation/submissions/pending",
             params={'page': page, 'per_page': per_page},
             cookies=request.cookies,
             timeout=5

@@ -267,6 +267,24 @@ class ResourceService:
         """
         return self.repo.get_community_submissions(dandiset_id)
 
+    @paginate
+    def get_all_approved_resources(self) -> List[Dict[str, Any]]:
+        """
+        Return all approved resources across all dandisets.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        return self.repo.get_all_approved_submissions()
+
+    @paginate
+    def get_all_pending_resources(self) -> List[Dict[str, Any]]:
+        """
+        Return all pending (community) resources across all dandisets.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        return self.repo.get_all_community_submissions()
+
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = "community") -> Optional[Dict[str, Any]]:
         """
         Retrieve a single submission by filename and status via the repository.
