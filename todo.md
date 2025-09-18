@@ -27,3 +27,5 @@
 - App tests for end-to-end API functionality
 
 6) Split get_user_submissions into community-only and approved-only sub-methods
+
+7) Remove excessive try-except blocks
