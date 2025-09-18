@@ -73,6 +73,127 @@ class ResourceRepository:
 
         return resource_id
 
+    def approve_submission(self, dandiset_id: str, filename: str, approver_info: Dict[str, Any]) -> bool:
+        """
+        Move a submission from community to approved folder and add approval information
+
+        Args:
+            dandiset_id: The dandiset identifier
+            filename: The filename of the submission to approve
+            approver_info: Information about the person approving (name, email, etc.)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            community_dir = self._get_community_dir(dandiset_id)
+            approved_dir = self._get_approved_dir(dandiset_id)
+
+            source_path = community_dir / filename
+            dest_path = approved_dir / filename
+
+            if not source_path.exists():
+                raise FileNotFoundError(f"Submission file not found: {filename}")
+
+            if dest_path.exists():
+                raise FileExistsError(f"File already exists in approved folder: {filename}")
+
+            # Load the existing submission data
+            with open(source_path, 'r', encoding='utf-8') as file:
+                submission_data = yaml.safe_load(file)
+
+            # Add approval information
+            submission_data['approval_contributor'] = {
+                'name': approver_info.get('name', 'Unknown Moderator'),
+                'email': approver_info.get('email'),
+                'identifier': approver_info.get('identifier'),
+                'url': approver_info.get('url'),
+                'schemaKey': 'AnnotationContributor'
+            }
+            submission_data['approval_date'] = datetime.now().astimezone().isoformat()
+
+            # Save the updated data to the approved folder
+            with open(dest_path, 'w', encoding='utf-8') as file:
+                yaml.dump(submission_data, file, default_flow_style=False,
+                         allow_unicode=True, sort_keys=False, indent=2)
+
+            # Remove the original file from community folder
+            source_path.unlink()
+
+            return True
+
+        except Exception as e:
+            raise Exception(f"Error approving submission: {str(e)}")
+         
+    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
+        """
+        Delete a submission and move it to backup folder with audit trail
+
+        Args:
+            dandiset_id: The dandiset identifier
+            filename: The submission filename to delete
+            status: 'community' or 'approved'
+            moderator_info: Information about the moderator performing deletion
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get source directory based on status
+            if status == 'community':
+                source_dir = self._get_community_dir(dandiset_id)
+            elif status == 'approved':
+                source_dir = self._get_approved_dir(dandiset_id)
+            else:
+                raise ValueError(f"Invalid status: {status}. Must be 'community' or 'approved'")
+
+            # Get source file path
+            source_path = source_dir / filename
+
+            if not source_path.exists():
+                raise FileNotFoundError(f"Submission file not found: {filename}")
+
+            # Create deleted directory structure
+            dandiset_dir = self._get_dandiset_dir(dandiset_id)
+            deleted_dir = dandiset_dir / "deleted" / status
+            deleted_dir.mkdir(parents=True, exist_ok=True)
+
+            # Generate timestamped filename for backup
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"deleted_{timestamp}_{filename}"
+            backup_path = deleted_dir / backup_filename
+
+            # Load the existing submission data
+            with open(source_path, 'r', encoding='utf-8') as file:
+                submission_data = yaml.safe_load(file)
+
+            # Add deletion metadata
+            submission_data['deletion_info'] = {
+                'deleted_by': {
+                    'name': moderator_info.get('name', 'Unknown Moderator'),
+                    'email': moderator_info.get('email'),
+                    'identifier': moderator_info.get('identifier'),
+                    'url': moderator_info.get('url'),
+                    'schemaKey': 'AnnotationContributor'
+                },
+                'deletion_date': datetime.now().astimezone().isoformat(),
+                'original_filename': filename,
+                'original_status': status
+            }
+
+            # Save the updated data to the backup folder
+            with open(backup_path, 'w', encoding='utf-8') as file:
+                yaml.dump(submission_data, file, default_flow_style=False,
+                         allow_unicode=True, sort_keys=False, indent=2)
+
+            # Remove the original file
+            source_path.unlink()
+
+            return True
+
+        except Exception as e:
+            raise Exception(f"Error deleting submission: {str(e)}")
+    
     def get_community_submissions(self, dandiset_id: str) -> List[Dict[str, Any]]:
         """
         Get all community submissions for a dandiset
@@ -195,58 +316,6 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error loading all approved submissions: {str(e)}")
 
-    def approve_submission(self, dandiset_id: str, filename: str, approver_info: Dict[str, Any]) -> bool:
-        """
-        Move a submission from community to approved folder and add approval information
-
-        Args:
-            dandiset_id: The dandiset identifier
-            filename: The filename of the submission to approve
-            approver_info: Information about the person approving (name, email, etc.)
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            community_dir = self._get_community_dir(dandiset_id)
-            approved_dir = self._get_approved_dir(dandiset_id)
-
-            source_path = community_dir / filename
-            dest_path = approved_dir / filename
-
-            if not source_path.exists():
-                raise FileNotFoundError(f"Submission file not found: {filename}")
-
-            if dest_path.exists():
-                raise FileExistsError(f"File already exists in approved folder: {filename}")
-
-            # Load the existing submission data
-            with open(source_path, 'r', encoding='utf-8') as file:
-                submission_data = yaml.safe_load(file)
-
-            # Add approval information
-            submission_data['approval_contributor'] = {
-                'name': approver_info.get('name', 'Unknown Moderator'),
-                'email': approver_info.get('email'),
-                'identifier': approver_info.get('identifier'),
-                'url': approver_info.get('url'),
-                'schemaKey': 'AnnotationContributor'
-            }
-            submission_data['approval_date'] = datetime.now().astimezone().isoformat()
-
-            # Save the updated data to the approved folder
-            with open(dest_path, 'w', encoding='utf-8') as file:
-                yaml.dump(submission_data, file, default_flow_style=False,
-                         allow_unicode=True, sort_keys=False, indent=2)
-
-            # Remove the original file from community folder
-            source_path.unlink()
-
-            return True
-
-        except Exception as e:
-            raise Exception(f"Error approving submission: {str(e)}")
-
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = 'community') -> Optional[Dict[str, Any]]:
         """
         Get a specific submission by filename
@@ -281,7 +350,6 @@ class ResourceRepository:
         except Exception as e:
             print(f"Error loading submission {filename}: {e}")
             return None
-
 
     def get_user_community_submissions(self, user_email: str) -> List[Dict[str, Any]]:
         """
@@ -348,73 +416,3 @@ class ResourceRepository:
 
         except Exception as e:
             raise Exception(f"Error loading user approved submissions: {str(e)}")
-
-
-    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
-        """
-        Delete a submission and move it to backup folder with audit trail
-
-        Args:
-            dandiset_id: The dandiset identifier
-            filename: The submission filename to delete
-            status: 'community' or 'approved'
-            moderator_info: Information about the moderator performing deletion
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Get source directory based on status
-            if status == 'community':
-                source_dir = self._get_community_dir(dandiset_id)
-            elif status == 'approved':
-                source_dir = self._get_approved_dir(dandiset_id)
-            else:
-                raise ValueError(f"Invalid status: {status}. Must be 'community' or 'approved'")
-
-            # Get source file path
-            source_path = source_dir / filename
-
-            if not source_path.exists():
-                raise FileNotFoundError(f"Submission file not found: {filename}")
-
-            # Create deleted directory structure
-            dandiset_dir = self._get_dandiset_dir(dandiset_id)
-            deleted_dir = dandiset_dir / "deleted" / status
-            deleted_dir.mkdir(parents=True, exist_ok=True)
-
-            # Generate timestamped filename for backup
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"deleted_{timestamp}_{filename}"
-            backup_path = deleted_dir / backup_filename
-
-            # Load the existing submission data
-            with open(source_path, 'r', encoding='utf-8') as file:
-                submission_data = yaml.safe_load(file)
-
-            # Add deletion metadata
-            submission_data['deletion_info'] = {
-                'deleted_by': {
-                    'name': moderator_info.get('name', 'Unknown Moderator'),
-                    'email': moderator_info.get('email'),
-                    'identifier': moderator_info.get('identifier'),
-                    'url': moderator_info.get('url'),
-                    'schemaKey': 'AnnotationContributor'
-                },
-                'deletion_date': datetime.now().astimezone().isoformat(),
-                'original_filename': filename,
-                'original_status': status
-            }
-
-            # Save the updated data to the backup folder
-            with open(backup_path, 'w', encoding='utf-8') as file:
-                yaml.dump(submission_data, file, default_flow_style=False,
-                         allow_unicode=True, sort_keys=False, indent=2)
-
-            # Remove the original file
-            source_path.unlink()
-
-            return True
-
-        except Exception as e:
-            raise Exception(f"Error deleting submission: {str(e)}")
