@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 import uuid
+from yaml import YAMLError
+from pydantic import ValidationError
 
 # Import for type hinting
 from dandiannotations.models.models import ExternalResource, AnnotationContributor
@@ -242,15 +244,19 @@ class ResourceRepository:
             for yaml_file in target_dir.glob("*.yaml"):
                 try:
                     with open(yaml_file, 'r', encoding='utf-8') as file:
-                        data = yaml.safe_load(file)
-                        if data:
-                            # Add metadata about the resource
-                            data['_submission_filename'] = yaml_file.name
-                            data['_submission_status'] = status
-                            data['status'] = status
-                            resources.append(data)
-                except Exception as e:
+                        loaded = yaml.safe_load(file) or {}
+                    resource = ExternalResource.model_validate(loaded)
+                    item = resource.model_dump(mode='json', exclude_none=True)
+                    item['_submission_filename'] = yaml_file.name
+                    resources.append(item)
+                except ValidationError as e:
+                    print(f"Validation error in {yaml_file}: {e}")
+                    continue
+                except (OSError, YAMLError) as e:
                     print(f"Error loading {yaml_file}: {e}")
+                    continue
+                except Exception as e:
+                    print(f"Unexpected error processing {yaml_file}: {e}")
                     continue
 
             # Sort by annotation_date (newest first)
