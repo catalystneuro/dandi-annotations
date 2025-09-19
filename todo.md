@@ -27,5 +27,3 @@
 - App tests for end-to-end API functionality
 
 7) Remove excessive try-except blocks
-
-8) Clarify naming: resource vs submission, pending vs community
