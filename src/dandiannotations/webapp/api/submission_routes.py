@@ -2,7 +2,7 @@
 API routes for resource submissions.
 
 Provides:
-- POST /api/submission -> create a new community submission
+- POST /api/submission -> create a new pending submission
 """
 from flask import Blueprint, request
 import os
@@ -24,7 +24,7 @@ resource_service = ResourceService(resource_repository)
 @handle_api_errors("Failed to submit resource")
 def submit_resource():
     """
-    Create a new community submission.
+    Create a new pending submission.
     
     Expects JSON payload with the form fields:
     - dandiset_id, resource_name, resource_url, repository, relation, resource_type

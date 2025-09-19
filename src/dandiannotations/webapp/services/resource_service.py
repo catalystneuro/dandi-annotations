@@ -3,7 +3,7 @@ ResourceService: business/service layer for resources/dandisets.
 
 This service implements the higher-level dandiset listing logic (moved
 from the previous repository implementation). It uses the repository
-for low-level file reads (community/approved submission lists) but
+for low-level file reads (pending/approved resource lists) but
 performs aggregation itself.
 
 Pagination is provided as a decorator `paginate` so any list-returning
@@ -167,12 +167,12 @@ class ResourceService:
     @paginate
     def get_all_dandisets(self) -> List[Dict[str, Any]]:
         """
-        Return all dandisets that have submissions (community or approved).
+        Return all dandisets that have resources (pending or approved).
 
         Each dandiset dict contains:
         - id: directory name (e.g., 'dandiset_000001')
         - display_id: like 'DANDI:000001'
-        - community_count
+        - pending_count
         - approved_count
         - total_count
 
@@ -187,12 +187,12 @@ class ResourceService:
             if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
                 dandiset_id = dandiset_dir.name
 
-                # Count submissions via repository methods
-                community_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'pending'))
+                # Count resources via repository methods
+                pending_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'pending'))
                 approved_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'approved'))
-                total_count = community_count + approved_count
+                total_count = pending_count + approved_count
 
-                # Only include dandisets that have submissions
+                # Only include dandisets that have resources
                 if total_count > 0:
                     # Format display name as DANDI:XXXXXX
                     display_id = f"DANDI:{dandiset_id.split('_')[1]}"
@@ -200,7 +200,7 @@ class ResourceService:
                     dandisets.append({
                         'id': dandiset_id,
                         'display_id': display_id,
-                        'community_count': community_count,
+                        'pending_count': pending_count,
                         'approved_count': approved_count,
                         'total_count': total_count
                     })
@@ -209,13 +209,13 @@ class ResourceService:
         dandisets.sort(key=lambda x: x['id'])
         return dandisets
 
-    def get_overview_stats(self, include_community: bool = False) -> Dict[str, Any]:
+    def get_overview_stats(self, include_pending: bool = False) -> Dict[str, Any]:
         """
         Compute overview statistics across all dandisets.
 
         Args:
-            include_community: If True include community submissions in totals;
-                               otherwise community totals will be zeroed.
+            include_pending: If True include pending resources in totals;
+                             otherwise pending totals will be zeroed.
 
         Returns:
             Dict with keys:
@@ -230,24 +230,24 @@ class ResourceService:
         total_dandisets = len(all_dandisets)
 
         unique_contributors = 0
-        if include_community:
-            total_community = sum(ds.get('community_count', 0) for ds in all_dandisets)
+        if include_pending:
+            total_pending = sum(ds.get('pending_count', 0) for ds in all_dandisets)
 
-            # Compute distinct contributor names across all pending submissions
+            # Compute distinct contributor names across all pending resources
             contributor_names = set()
             for ds in all_dandisets:
-                if ds.get('community_count', 0) > 0:
+                if ds.get('pending_count', 0) > 0:
                     for sub in self.repo.get_resources_by_dandiset(ds['id'], 'pending'):
                         name = sub.get('annotation_contributor', {}).get('name')
                         if name:
                             contributor_names.add(name)
             unique_contributors = len(contributor_names)
         else:
-            total_community = 0
+            total_pending = 0
 
         return {
             'total_approved': total_approved,
-            'total_community': total_community,
+            'total_pending': total_pending,
             'total_dandisets': total_dandisets,
             'unique_contributors': unique_contributors,
         }
@@ -255,31 +255,31 @@ class ResourceService:
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """
         Return detailed statistics for a specific dandiset.
-        Computed from approved + community lists to avoid brittle existence checks.
+        Computed from approved + pending lists to avoid brittle existence checks.
         """
         # Fetch lists using repository helpers (these tolerate missing dirs)
         approved_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'approved')
-        community_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'pending')
+        pending_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'pending')
 
         # Build display ID
         display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
 
         # Aggregate counts
         approved_count = len(approved_submissions)
-        pending_count = len(community_submissions)
+        pending_count = len(pending_submissions)
         total_count = approved_count + pending_count
 
         # Unique contributors across both lists
         unique_contributors = len({
             sub.get('annotation_contributor', {}).get('name')
-            for sub in approved_submissions + community_submissions
+            for sub in approved_submissions + pending_submissions
             if sub.get('annotation_contributor', {}).get('name')
         })
 
         # Breakdown counts
         resource_types = {}
         repositories = {}
-        for sub in approved_submissions + community_submissions:
+        for sub in approved_submissions + pending_submissions:
             rt = sub.get('resourceType', 'Unknown')
             repo = sub.get('repository', 'Unknown')
             resource_types[rt] = resource_types.get(rt, 0) + 1
@@ -346,7 +346,7 @@ class ResourceService:
     # ---------------------------
     def submit_resource(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate and save a new community submission.
+        Validate and save a new pending resource submission.
         
         Args:
             form_data: Form data dictionary containing submission fields
@@ -397,7 +397,7 @@ class ResourceService:
         except Exception as e:
             raise ValueError(f'Validation error: {str(e)}')
         
-        # Save to community submissions folder using repository
+        # Save to pending resources folder using repository
         resource_id = self.repo.save_resource(dandiset_id=form_data['dandiset_id'], external_resource=resource)
 
         # Return properly formatted response data for API consumption

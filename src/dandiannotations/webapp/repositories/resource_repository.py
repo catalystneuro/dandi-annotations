@@ -21,25 +21,6 @@ class ResourceRepository:
         """
         self.base_dir = Path(base_submissions_dir)
         self.base_dir.mkdir(exist_ok=True)
-        # One-time migration: rename 'community' -> 'pending' directories if needed
-        for dandiset_dir in self.base_dir.iterdir():
-            if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
-                community_dir = dandiset_dir / "community"
-                pending_dir = dandiset_dir / "pending"
-                if community_dir.exists() and not pending_dir.exists():
-                    try:
-                        community_dir.rename(pending_dir)
-                    except Exception:
-                        pass
-                deleted_dir = dandiset_dir / "deleted"
-                deleted_community = deleted_dir / "community"
-                deleted_pending = deleted_dir / "pending"
-                if deleted_community.exists() and not deleted_pending.exists():
-                    try:
-                        deleted_pending.parent.mkdir(parents=True, exist_ok=True)
-                        deleted_community.rename(deleted_pending)
-                    except Exception:
-                        pass
 
     def _get_dandiset_dir(self, dandiset_id: str) -> Path:
         """Get the directory path for a specific dandiset"""
@@ -94,7 +75,7 @@ class ResourceRepository:
 
     def approve_submission(self, dandiset_id: str, filename: str, approver_info: Dict[str, Any]) -> bool:
         """
-        Move a submission from community to approved folder and add approval information
+        Move a submission from pending to approved folder and add approval information
 
         Args:
             dandiset_id: The dandiset identifier
@@ -136,7 +117,7 @@ class ResourceRepository:
                 yaml.dump(submission_data, file, default_flow_style=False,
                          allow_unicode=True, sort_keys=False, indent=2)
 
-            # Remove the original file from community folder
+            # Remove the original file from pending folder
             source_path.unlink()
 
             return True

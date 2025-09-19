@@ -135,7 +135,7 @@ def index():
 
         total_approved = stats.get('total_approved', 0)
         total_dandisets = stats.get('total_dandisets', 0)
-        total_community = stats.get('total_community', 0)
+        total_community = stats.get('total_pending', 0)
 
         return render_template('homepage.html',
                              all_dandisets=paginated_dandisets,

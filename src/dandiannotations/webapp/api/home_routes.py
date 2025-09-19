@@ -3,7 +3,7 @@ Minimal API routes for the homepage.
 
 Provides:
 - GET /api/dandisets         -> paginated list of dandisets (accepts page, per_page)
-- GET /api/dandisets/overview -> overview statistics (accepts include_community=true|false)
+- GET /api/dandisets/overview -> overview statistics (accepts include_pending=true|false)
 
 This is intentionally small and independent so you can start from scratch for the homepage API.
 """
@@ -51,9 +51,9 @@ def get_overview_stats():
     """
     Return overview statistics.
 
-    If the user is a moderator, include community counts in the totals.
+    If the user is a moderator, include pending counts in the totals.
     """
-    include_community = auth_manager.is_moderator()
-    stats = resource_service.get_overview_stats(include_community=include_community)
+    include_pending = auth_manager.is_moderator()
+    stats = resource_service.get_overview_stats(include_pending=include_pending)
     response = success_response(data=stats, message="Overview statistics retrieved successfully.")
     return response
