@@ -257,8 +257,8 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_dandiset_id(dandiset_id)
-        status_norm = self._validate_status(status)
-        return self.repo.get_submissions_by_dandiset(dandiset_id, status_norm)
+        self._validate_status(status)
+        return self.repo.get_submissions_by_dandiset(dandiset_id, status)
 
 
     @paginate
@@ -268,8 +268,8 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        status_norm = self._validate_status(status)
-        return self.repo.get_all_submissions(status_norm)
+        self._validate_status(status)
+        return self.repo.get_all_submissions(status)
 
 
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str) -> Optional[Dict[str, Any]]:
@@ -277,8 +277,8 @@ class ResourceService:
         Validate input and return a submission by filename and status (serialized).
         """
         self._validate_dandiset_id(dandiset_id)
-        status_norm = self._validate_status(status)
-        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status_norm)
+        self._validate_status(status)
+        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status)
         return self._serialize_resource(submission)
 
     # ---------------------------
@@ -316,14 +316,12 @@ class ResourceService:
         if not re.match(pattern, orcid):
             raise ValueError("Invalid moderator ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000")
 
-    def _validate_status(self, status: Optional[str]) -> str:
+    def _validate_status(self, status: str) -> None:
         """
-        Normalize and validate submission status. Returns normalized status.
+        Validate submission status.
         """
-        status_norm = (status or "").strip().lower()
-        if status_norm not in {"community", "approved"}:
+        if status not in {"community", "approved"}:
             raise ValueError("Status parameter must be 'community' or 'approved'")
-        return status_norm
 
     # ---------------------------
     # Serialization helper (service-layer serialization)
@@ -415,9 +413,7 @@ class ResourceService:
         """
         # Basic input checks
         self._validate_dandiset_id(dandiset_id)
-        status_norm = (status or '').strip().lower()
-        if status_norm not in {'community', 'approved'}:
-            raise ValueError("Status parameter must be 'community' or 'approved'")
+        self._validate_status(status)
 
         name = (data or {}).get('moderator_name', '').strip()
         email = (data or {}).get('moderator_email', '').strip()
@@ -437,14 +433,14 @@ class ResourceService:
             moderator_info['url'] = url_field
 
         # Load submission pre-delete to capture resource_name
-        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status_norm)
+        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status)
         if not submission:
             raise FileNotFoundError("Submission not found")
 
         resource_name = submission.get('name', filename)
 
         # Delegate deletion to repository (moves to backup and deletes original)
-        success = self.repo.delete_submission(dandiset_id, filename, status_norm, moderator_info)
+        success = self.repo.delete_submission(dandiset_id, filename, status, moderator_info)
         if not success:
             raise Exception("Deletion failed")
 
@@ -452,7 +448,7 @@ class ResourceService:
         return {
             'dandiset_id': dandiset_id,
             'filename': filename,
-            'status': status_norm,
+            'status': status,
             'resource_name': resource_name,
             'deleted_by': name,
             'deletion_date': deletion_date,
@@ -465,8 +461,8 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        status_norm = self._validate_status(status)
-        return self.repo.get_submissions_by_user(user_email, status_norm)
+        self._validate_status(status)
+        return self.repo.get_submissions_by_user(user_email, status)
 
 
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
