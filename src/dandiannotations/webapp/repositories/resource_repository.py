@@ -80,7 +80,7 @@ class ResourceRepository:
         Args:
             dandiset_id: The dandiset identifier
             filename: The filename of the submission to approve
-            approver_info: Information about the person approving (name, email, etc.)
+            approver: AnnotationContributor model for the person approving
 
         Returns:
             True if successful, False otherwise
@@ -121,7 +121,7 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error approving submission: {str(e)}")
          
-    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
+    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator: AnnotationContributor) -> bool:
         """
         Delete a resource and move it to backup folder with audit trail
 
@@ -129,7 +129,7 @@ class ResourceRepository:
             dandiset_id: The dandiset identifier
             filename: The resource filename to delete
             status: 'pending' or 'approved'
-            moderator_info: Information about the moderator performing deletion
+            moderator: AnnotationContributor model for the moderator performing deletion
 
         Returns:
             True if successful, False otherwise
@@ -159,27 +159,24 @@ class ResourceRepository:
             backup_filename = f"deleted_{timestamp}_{filename}"
             backup_path = deleted_dir / backup_filename
 
-            # Load the existing submission data
+            # Load and validate the existing submission as ExternalResource
             with open(source_path, 'r', encoding='utf-8') as file:
-                submission_data = yaml.safe_load(file)
+                submission_data = yaml.safe_load(file) or {}
+            resource = ExternalResource.model_validate(submission_data)
 
-            # Add deletion metadata
-            submission_data['deletion_info'] = {
-                'deleted_by': {
-                    'name': moderator_info.get('name', 'Unknown Moderator'),
-                    'email': moderator_info.get('email'),
-                    'identifier': moderator_info.get('identifier'),
-                    'url': moderator_info.get('url'),
-                    'schemaKey': 'AnnotationContributor'
-                },
+            # Compose deletion audit info using Pydantic models
+            deletion_info = {
+                'deleted_by': moderator.model_dump(mode='json', exclude_none=True),
                 'deletion_date': datetime.now().astimezone().isoformat(),
                 'original_filename': filename,
                 'original_status': status
             }
 
-            # Save the updated data to the backup folder
+            # Prepare backup payload and write to backup folder
+            backup_payload = resource.model_dump(mode='json', exclude_none=True)
+            backup_payload['deletion_info'] = deletion_info
             with open(backup_path, 'w', encoding='utf-8') as file:
-                yaml.dump(submission_data, file, default_flow_style=False,
+                yaml.dump(backup_payload, file, default_flow_style=False,
                          allow_unicode=True, sort_keys=False, indent=2)
 
             # Remove the original file

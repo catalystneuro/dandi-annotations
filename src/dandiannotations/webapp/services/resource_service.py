@@ -483,15 +483,17 @@ class ResourceService:
 
         if not name:
             raise ValueError("Moderator name is required")
-        self._validate_email(email)
-        self._validate_orcid(identifier)
-        self._validate_url(url_field)
 
-        moderator_info = {'name': name, 'email': email}
-        if identifier:
-            moderator_info['identifier'] = identifier
-        if url_field:
-            moderator_info['url'] = url_field
+        try:
+            moderator = AnnotationContributor(
+                name=name,
+                email=email,
+                identifier=identifier or None,
+                url=url_field or None,
+            )
+        except Exception as e:
+            # Normalize Pydantic validation errors to ValueError for route handling
+            raise ValueError(f"Validation error: {str(e)}")
 
         # Load submission pre-delete to capture resource_name
         submission = self.repo.get_resource_by_filename(dandiset_id, filename, status)
@@ -501,7 +503,7 @@ class ResourceService:
         resource_name = submission.get('name', filename)
 
         # Delegate deletion to repository (moves to backup and deletes original)
-        success = self.repo.delete_submission(dandiset_id, filename, status, moderator_info)
+        success = self.repo.delete_submission(dandiset_id, filename, status, moderator)
         if not success:
             raise Exception("Deletion failed")
 
