@@ -42,7 +42,7 @@ def get_approved_resources(dandiset_id):
     page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=9, type=int)
 
-    items, pagination = resource_service.get_approved_resources(dandiset_id, page=page, per_page=per_page)
+    items, pagination = resource_service.get_resources_by_dandiset(dandiset_id, 'approved', page=page, per_page=per_page)
     return success_response(data=items, pagination=pagination, message="Approved resources retrieved successfully.")
 
 
@@ -69,7 +69,7 @@ def get_community_resources(dandiset_id):
     page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=9, type=int)
 
-    items, pagination = resource_service.get_pending_resources(dandiset_id, page=page, per_page=per_page)
+    items, pagination = resource_service.get_resources_by_dandiset(dandiset_id, 'community', page=page, per_page=per_page)
     return success_response(data=items, pagination=pagination, message="Community resources retrieved successfully.")
 
 

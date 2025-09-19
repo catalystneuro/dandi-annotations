@@ -250,46 +250,36 @@ class ResourceService:
         }
 
     @paginate
-    def get_approved_resources(self, dandiset_id: str) -> List[Dict[str, Any]]:
+    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
         """
-        Return approved resources for a dandiset.
+        Return resources for a dandiset by status ('community' or 'approved').
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_submissions_by_dandiset(dandiset_id, 'approved')
+        self._validate_dandiset_id(dandiset_id)
+        status_norm = self._validate_status(status)
+        return self.repo.get_submissions_by_dandiset(dandiset_id, status_norm)
+
 
     @paginate
-    def get_pending_resources(self, dandiset_id: str) -> List[Dict[str, Any]]:
+    def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
         """
-        Return community (pending) resources for a dandiset.
+        Return all resources across all dandisets for a given status.
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_submissions_by_dandiset(dandiset_id, 'community')
+        status_norm = self._validate_status(status)
+        return self.repo.get_all_submissions(status_norm)
 
-    @paginate
-    def get_all_approved_resources(self) -> List[Dict[str, Any]]:
-        """
-        Return all approved resources across all dandisets.
 
-        When called with kwargs page/per_page, returns (items, pagination_info).
+    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str) -> Optional[Dict[str, Any]]:
         """
-        return self.repo.get_all_submissions('approved')
-
-    @paginate
-    def get_all_pending_resources(self) -> List[Dict[str, Any]]:
+        Validate input and return a submission by filename and status (serialized).
         """
-        Return all pending (community) resources across all dandisets.
-
-        When called with kwargs page/per_page, returns (items, pagination_info).
-        """
-        return self.repo.get_all_submissions('community')
-
-    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = "community") -> Optional[Dict[str, Any]]:
-        """
-        Retrieve a single submission by filename and status via the repository.
-        """
-        return self.repo.get_submission_by_filename(dandiset_id, filename, status)
+        self._validate_dandiset_id(dandiset_id)
+        status_norm = self._validate_status(status)
+        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status_norm)
+        return self._serialize_resource(submission)
 
     # ---------------------------
     # Validation helpers (service-layer validation)
@@ -326,6 +316,15 @@ class ResourceService:
         if not re.match(pattern, orcid):
             raise ValueError("Invalid moderator ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000")
 
+    def _validate_status(self, status: Optional[str]) -> str:
+        """
+        Normalize and validate submission status. Returns normalized status.
+        """
+        status_norm = (status or "").strip().lower()
+        if status_norm not in {"community", "approved"}:
+            raise ValueError("Status parameter must be 'community' or 'approved'")
+        return status_norm
+
     # ---------------------------
     # Serialization helper (service-layer serialization)
     # ---------------------------
@@ -350,15 +349,6 @@ class ResourceService:
     # ---------------------------
     # Moderation: GET pending submission (with validation + serialization)
     # ---------------------------
-    def get_pending_submission(self, dandiset_id: str, filename: str) -> Optional[Dict[str, Any]]:
-        """
-        Validate input and return the pending (community) submission, serialized.
-        Returns None if not found.
-        Raises ValueError on validation failures.
-        """
-        self._validate_dandiset_id(dandiset_id)
-        submission = self.repo.get_submission_by_filename(dandiset_id, filename, "community")
-        return self._serialize_resource(submission)
 
     def approve_submission(self, dandiset_id: str, filename: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -469,22 +459,15 @@ class ResourceService:
         }
 
     @paginate
-    def get_user_pending_resources(self, user_email: str) -> List[Dict[str, Any]]:
+    def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
         """
-        Return pending (community) resources for a user.
+        Return resources for a user by status.
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        return self.repo.get_submissions_by_user(user_email, 'community')
+        status_norm = self._validate_status(status)
+        return self.repo.get_submissions_by_user(user_email, status_norm)
 
-    @paginate
-    def get_user_approved_resources(self, user_email: str) -> List[Dict[str, Any]]:
-        """
-        Return approved resources for a user.
-
-        When called with kwargs page/per_page, returns (items, pagination_info).
-        """
-        return self.repo.get_submissions_by_user(user_email, 'approved')
 
     def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
         """

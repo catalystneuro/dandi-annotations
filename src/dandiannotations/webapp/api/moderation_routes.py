@@ -51,7 +51,7 @@ def get_submission(dandiset_id, filename):
             return forbidden_response(auth_error["error"])
 
     try:
-        submission = resource_service.get_pending_submission(dandiset_id, filename)
+        submission = resource_service.get_submission_by_filename(dandiset_id, filename, 'community')
         if not submission:
             return not_found_response("Submission")
         return success_response(data=submission, message="Submission retrieved successfully")
@@ -81,7 +81,7 @@ def get_all_pending_submissions():
     per_page = request.args.get("per_page", 10, type=int)
 
     # Fetch data via service
-    items, pagination = resource_service.get_all_pending_resources(page=page, per_page=per_page)
+    items, pagination = resource_service.get_all_resources('community', page=page, per_page=per_page)
 
     return success_response(
         data=items,
@@ -110,8 +110,8 @@ def get_all_approved_submissions():
     per_page = request.args.get("per_page", 10, type=int)
 
     # Fetch data via service (@paginate provides items, pagination)
-    items, pagination = resource_service.get_all_approved_resources(
-        page=page, per_page=per_page
+    items, pagination = resource_service.get_all_resources(
+        'approved', page=page, per_page=per_page
     )
 
     return success_response(

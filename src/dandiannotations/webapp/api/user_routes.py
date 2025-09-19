@@ -55,8 +55,9 @@ def get_user_community_submissions(user_email):
     if page < 1 or per_page < 1:
         return validation_error_response("Pagination parameters must be >= 1")
 
-    items, pagination = resource_service.get_user_pending_resources(
+    items, pagination = resource_service.get_resources_by_user(
         user_email=user_email,
+        status='community',
         page=page,
         per_page=per_page,
     )
@@ -96,8 +97,9 @@ def get_user_approved_submissions(user_email):
     if page < 1 or per_page < 1:
         return validation_error_response("Pagination parameters must be >= 1")
 
-    items, pagination = resource_service.get_user_approved_resources(
+    items, pagination = resource_service.get_resources_by_user(
         user_email=user_email,
+        status='approved',
         page=page,
         per_page=per_page,
     )
