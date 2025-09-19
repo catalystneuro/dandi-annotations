@@ -27,3 +27,7 @@
 - App tests for end-to-end API functionality
 
 7) Remove excessive try-except blocks
+
+8) Update docstrings to numpy style
+
+9) Update functions/methods to keyword-only
