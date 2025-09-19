@@ -135,10 +135,10 @@ class ResourceService:
 
     def _validate_status(self, status: str) -> None:
         """
-        Validate submission status.
+        Validate resource status.
         """
-        if status not in {"community", "approved"}:
-            raise ValueError("Status parameter must be 'community' or 'approved'")
+        if status not in {"pending", "approved"}:
+            raise ValueError("Status parameter must be 'pending' or 'approved'")
 
     # ---------------------------
     # Serialization helper (service-layer serialization)
@@ -188,8 +188,8 @@ class ResourceService:
                 dandiset_id = dandiset_dir.name
 
                 # Count submissions via repository methods
-                community_count = len(self.repo.get_submissions_by_dandiset(dandiset_id, 'community'))
-                approved_count = len(self.repo.get_submissions_by_dandiset(dandiset_id, 'approved'))
+                community_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'pending'))
+                approved_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'approved'))
                 total_count = community_count + approved_count
 
                 # Only include dandisets that have submissions
@@ -237,7 +237,7 @@ class ResourceService:
             contributor_names = set()
             for ds in all_dandisets:
                 if ds.get('community_count', 0) > 0:
-                    for sub in self.repo.get_submissions_by_dandiset(ds['id'], 'community'):
+                    for sub in self.repo.get_resources_by_dandiset(ds['id'], 'pending'):
                         name = sub.get('annotation_contributor', {}).get('name')
                         if name:
                             contributor_names.add(name)
@@ -258,8 +258,8 @@ class ResourceService:
         Computed from approved + community lists to avoid brittle existence checks.
         """
         # Fetch lists using repository helpers (these tolerate missing dirs)
-        approved_submissions = self.repo.get_submissions_by_dandiset(dandiset_id, 'approved')
-        community_submissions = self.repo.get_submissions_by_dandiset(dandiset_id, 'community')
+        approved_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'approved')
+        community_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'pending')
 
         # Build display ID
         display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
@@ -302,13 +302,13 @@ class ResourceService:
     @paginate
     def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
         """
-        Return resources for a dandiset by status ('community' or 'approved').
+        Return resources for a dandiset by status ('pending' or 'approved').
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        return self.repo.get_submissions_by_dandiset(dandiset_id, status)
+        return self.repo.get_resources_by_dandiset(dandiset_id, status)
 
 
     @paginate
@@ -319,16 +319,16 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_status(status)
-        return self.repo.get_all_submissions(status)
+        return self.repo.get_all_resources(status)
 
 
     def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str) -> Optional[Dict[str, Any]]:
         """
-        Validate input and return a submission by filename and status (serialized).
+        Validate input and return a resource by filename and status (serialized).
         """
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status)
+        submission = self.repo.get_resource_by_filename(dandiset_id, filename, status)
         return self._serialize_resource(submission)
 
     @paginate
@@ -339,7 +339,7 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_status(status)
-        return self.repo.get_submissions_by_user(user_email, status)
+        return self.repo.get_resources_by_user(user_email, status)
 
     # ---------------------------
     # Submission management (create/approve/delete)
@@ -439,7 +439,7 @@ class ResourceService:
             moderator_info['url'] = url_field
 
         # Ensure the pending submission exists before attempting approval
-        pending = self.repo.get_submission_by_filename(dandiset_id, filename, "community")
+        pending = self.repo.get_resource_by_filename(dandiset_id, filename, "pending")
         if not pending:
             # Let the route decide 404 vs 500 by raising FileNotFoundError
             raise FileNotFoundError("Submission not found")
@@ -449,17 +449,17 @@ class ResourceService:
         if not success:
             raise Exception("Approval failed")
 
-        approved = self.repo.get_submission_by_filename(dandiset_id, filename, "approved")
+        approved = self.repo.get_resource_by_filename(dandiset_id, filename, "approved")
         return self._serialize_resource(approved)
 
     def delete_submission(self, dandiset_id: str, filename: str, status: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Delete a submission (community or approved) and return a deletion summary.
+        Delete a resource (pending or approved) and return a deletion summary.
 
         Args:
             dandiset_id: Dandiset identifier (may be 'dandiset_XXXXXX' or 'XXXXXX')
             filename: Submission filename to delete
-            status: 'community' or 'approved'
+            status: 'pending' or 'approved'
             data: JSON payload containing moderator info:
                   - moderator_name (required)
                   - moderator_email (required)
@@ -492,7 +492,7 @@ class ResourceService:
             moderator_info['url'] = url_field
 
         # Load submission pre-delete to capture resource_name
-        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status)
+        submission = self.repo.get_resource_by_filename(dandiset_id, filename, status)
         if not submission:
             raise FileNotFoundError("Submission not found")
 

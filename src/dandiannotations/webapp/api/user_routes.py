@@ -16,7 +16,7 @@ from dandiannotations.webapp.services.resource_service import ResourceService
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.utils.auth import AuthManager
 
-user_api_bp = Blueprint("user_api", __name__, url_prefix="/submissions")
+user_api_bp = Blueprint("user_api", __name__, url_prefix="/resources")
 
 # Reuse the same storage/config as other API modules
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "submissions")
@@ -31,11 +31,11 @@ auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
 @handle_api_errors("Failed to retrieve user submissions")
 def get_user_submissions_by_status(user_email, status):
     """
-    GET /api/submissions/user/{user_email}/{status}
+    GET /api/resources/user/{user_email}/{status}
     Return the current user's submissions by status (authentication required).
     Users can only view their own submissions.
     Path params:
-      - status: 'community' or 'approved'
+      - status: 'pending' or 'approved'
     Query params:
       - page (int, default 1)
       - per_page (int, default 10)
@@ -50,8 +50,8 @@ def get_user_submissions_by_status(user_email, status):
         return forbidden_response("You can only view your own submissions")
 
     # Validate status exactly
-    if status not in {"community", "approved"}:
-        return validation_error_response("Status parameter must be 'community' or 'approved'")
+    if status not in {"pending", "approved"}:
+        return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     # Parse pagination params
     page = request.args.get("page", default=1, type=int)

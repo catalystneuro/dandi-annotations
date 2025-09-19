@@ -21,6 +21,25 @@ class ResourceRepository:
         """
         self.base_dir = Path(base_submissions_dir)
         self.base_dir.mkdir(exist_ok=True)
+        # One-time migration: rename 'community' -> 'pending' directories if needed
+        for dandiset_dir in self.base_dir.iterdir():
+            if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                community_dir = dandiset_dir / "community"
+                pending_dir = dandiset_dir / "pending"
+                if community_dir.exists() and not pending_dir.exists():
+                    try:
+                        community_dir.rename(pending_dir)
+                    except Exception:
+                        pass
+                deleted_dir = dandiset_dir / "deleted"
+                deleted_community = deleted_dir / "community"
+                deleted_pending = deleted_dir / "pending"
+                if deleted_community.exists() and not deleted_pending.exists():
+                    try:
+                        deleted_pending.parent.mkdir(parents=True, exist_ok=True)
+                        deleted_community.rename(deleted_pending)
+                    except Exception:
+                        pass
 
     def _get_dandiset_dir(self, dandiset_id: str) -> Path:
         """Get the directory path for a specific dandiset"""
@@ -34,12 +53,12 @@ class ResourceRepository:
 
         return self.base_dir / dandiset_id
 
-    def _get_community_dir(self, dandiset_id: str) -> Path:
-        """Get the community submissions directory for a dandiset"""
+    def _get_pending_dir(self, dandiset_id: str) -> Path:
+        """Get the pending resources directory for a dandiset"""
         dandiset_dir = self._get_dandiset_dir(dandiset_id)
-        community_dir = dandiset_dir / "community"
-        community_dir.mkdir(parents=True, exist_ok=True)
-        return community_dir
+        pending_dir = dandiset_dir / "pending"
+        pending_dir.mkdir(parents=True, exist_ok=True)
+        return pending_dir
 
     def _get_approved_dir(self, dandiset_id: str) -> Path:
         """Get the approved submissions directory for a dandiset"""
@@ -50,7 +69,7 @@ class ResourceRepository:
 
     def save_resource(self, dandiset_id: str, external_resource: ExternalResource) -> str:
         """
-        Save a new community submission
+        Save a new pending resource
 
         Args:
             dandiset_id: The dandiset identifier
@@ -59,10 +78,10 @@ class ResourceRepository:
         Returns:
             The resource ID of the saved resource
         """
-        community_dir = self._get_community_dir(dandiset_id)
+        pending_dir = self._get_pending_dir(dandiset_id)
         resource_id = str(uuid.uuid4())
         filename = f"{resource_id}.yaml"
-        filepath = community_dir / filename
+        filepath = pending_dir / filename
 
         # Convert Pydantic model to dict for YAML serialization
         resource_data = external_resource.model_dump(mode='json', exclude_none=True)
@@ -86,10 +105,10 @@ class ResourceRepository:
             True if successful, False otherwise
         """
         try:
-            community_dir = self._get_community_dir(dandiset_id)
+            pending_dir = self._get_pending_dir(dandiset_id)
             approved_dir = self._get_approved_dir(dandiset_id)
 
-            source_path = community_dir / filename
+            source_path = pending_dir / filename
             dest_path = approved_dir / filename
 
             if not source_path.exists():
@@ -127,12 +146,12 @@ class ResourceRepository:
          
     def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator_info: Dict[str, Any]) -> bool:
         """
-        Delete a submission and move it to backup folder with audit trail
+        Delete a resource and move it to backup folder with audit trail
 
         Args:
             dandiset_id: The dandiset identifier
-            filename: The submission filename to delete
-            status: 'community' or 'approved'
+            filename: The resource filename to delete
+            status: 'pending' or 'approved'
             moderator_info: Information about the moderator performing deletion
 
         Returns:
@@ -140,12 +159,12 @@ class ResourceRepository:
         """
         try:
             # Get source directory based on status
-            if status == 'community':
-                source_dir = self._get_community_dir(dandiset_id)
+            if status == 'pending':
+                source_dir = self._get_pending_dir(dandiset_id)
             elif status == 'approved':
                 source_dir = self._get_approved_dir(dandiset_id)
             else:
-                raise ValueError(f"Invalid status: {status}. Must be 'community' or 'approved'")
+                raise ValueError(f"Invalid status: {status}. Must be 'pending' or 'approved'")
 
             # Get source file path
             source_path = source_dir / filename
@@ -194,94 +213,93 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error deleting submission: {str(e)}")
      
-    def get_all_submissions(self, status: str) -> List[Dict[str, Any]]:
+    def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
         """
-        Get all submissions across all dandisets for the given status.
+        Get all resources across all dandisets for the given status.
 
         Args:
-            status: 'community' or 'approved'
+            status: 'pending' or 'approved'
 
         Returns:
-            List of all submissions with dandiset info for the specified status
+            List of all resources with dandiset info for the specified status
         """
         try:
-            status_norm = (status or '').strip().lower()
-            if status_norm not in {'community', 'approved'}:
-                raise ValueError("Invalid status: must be 'community' or 'approved'")
+            if status not in {'pending', 'approved'}:
+                raise ValueError("Invalid status: must be 'pending' or 'approved'")
 
-            all_submissions: List[Dict[str, Any]] = []
+            all_resources: List[Dict[str, Any]] = []
 
             # Iterate through all dandiset directories
             for dandiset_dir in self.base_dir.iterdir():
                 if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
                     dandiset_id = dandiset_dir.name
-                    submissions = self.get_submissions_by_dandiset(dandiset_id, status_norm)
+                    resources = self.get_resources_by_dandiset(dandiset_id, status)
 
-                    # Add dandiset info to each submission
-                    for submission in submissions:
-                        submission['_dandiset_id'] = dandiset_id
-                        all_submissions.append(submission)
+                    # Add dandiset info to each resource
+                    for res in resources:
+                        res['_dandiset_id'] = dandiset_id
+                        all_resources.append(res)
 
             # Sort by annotation_date (newest first)
-            all_submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
-            return all_submissions
+            all_resources.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            return all_resources
 
         except Exception as e:
-            raise Exception(f"Error loading all {status} submissions: {str(e)}")
+            raise Exception(f"Error loading all {status} resources: {str(e)}")
 
-    def get_submissions_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
+    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
         """
-        Get submissions for a dandiset by status.
+        Get resources for a dandiset by status.
 
         Args:
             dandiset_id: The dandiset identifier
-            status: 'community' or 'approved'
+            status: 'pending' or 'approved'
 
         Returns:
-            List of submission data with metadata for the requested status
+            List of resource data with metadata for the requested status
         """
         try:
-            status_norm = (status or '').strip().lower()
-            if status_norm not in {'community', 'approved'}:
-                raise ValueError("Invalid status: must be 'community' or 'approved'")
+            if status not in {'pending', 'approved'}:
+                raise ValueError("Invalid status: must be 'pending' or 'approved'")
 
-            target_dir = self._get_community_dir(dandiset_id) if status_norm == 'community' else self._get_approved_dir(dandiset_id)
-            submissions: List[Dict[str, Any]] = []
+            target_dir = self._get_pending_dir(dandiset_id) if status == 'pending' else self._get_approved_dir(dandiset_id)
+            resources: List[Dict[str, Any]] = []
 
             for yaml_file in target_dir.glob("*.yaml"):
                 try:
                     with open(yaml_file, 'r', encoding='utf-8') as file:
                         data = yaml.safe_load(file)
                         if data:
-                            # Add metadata about the submission
+                            # Add metadata about the resource
                             data['_submission_filename'] = yaml_file.name
-                            data['_submission_status'] = status_norm
-                            submissions.append(data)
+                            data['_submission_status'] = status
+                            data['status'] = status
+                            resources.append(data)
                 except Exception as e:
                     print(f"Error loading {yaml_file}: {e}")
                     continue
 
             # Sort by annotation_date (newest first)
-            submissions.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
-            return submissions
+            resources.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            return resources
         except Exception as e:
-            raise Exception(f"Error loading {status} submissions: {str(e)}")
+            raise Exception(f"Error loading {status} resources: {str(e)}")
 
-    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str = 'community') -> Optional[Dict[str, Any]]:
+    def get_resource_by_filename(self, dandiset_id: str, filename: str, status: str = 'pending') -> Optional[Dict[str, Any]]:
         """
-        Get a specific submission by filename
+        Get a specific resource by filename
 
         Args:
             dandiset_id: The dandiset identifier
-            filename: The submission filename
-            status: 'community' or 'approved'
+            filename: The resource filename
+            status: 'pending' or 'approved'
 
         Returns:
-            The submission data or None if not found
+            The resource data or None if not found
         """
         try:
-            if status == 'community':
-                target_dir = self._get_community_dir(dandiset_id)
+            if status == 'pending':
+                target_dir = self._get_pending_dir(dandiset_id)
             else:
                 target_dir = self._get_approved_dir(dandiset_id)
 
@@ -295,28 +313,28 @@ class ResourceRepository:
                 if data:
                     data['_submission_filename'] = filename
                     data['_submission_status'] = status
+                    data['status'] = status
                     data['_dandiset_id'] = dandiset_id
                 return data
 
         except Exception as e:
-            print(f"Error loading submission {filename}: {e}")
+            print(f"Error loading resource {filename}: {e}")
             return None
 
-    def get_submissions_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
+    def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
         """
-        Get submissions for a specific user by status across all dandisets.
+        Get resources for a specific user by status across all dandisets.
 
         Args:
             user_email: Email address of the user
-            status: 'community' or 'approved'
+            status: 'pending' or 'approved'
 
         Returns:
-            List of submissions for the user across all dandisets.
+            List of resources for the user across all dandisets.
         """
         try:
-            status_norm = (status or '').strip().lower()
-            if status_norm not in {'community', 'approved'}:
-                raise ValueError("Invalid status: must be 'community' or 'approved'")
+            if status not in {'pending', 'approved'}:
+                raise ValueError("Invalid status: must be 'pending' or 'approved'")
 
             collected: List[Dict[str, Any]] = []
 
@@ -325,17 +343,17 @@ class ResourceRepository:
                 if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
                     dandiset_id = dandiset_dir.name
 
-                    # Get submissions for this dandiset by status
-                    dandiset_submissions = self.get_submissions_by_dandiset(dandiset_id, status_norm)
-                    for submission in dandiset_submissions:
-                        contributor_email = submission.get('annotation_contributor', {}).get('email', '')
+                    # Get resources for this dandiset by status
+                    dandiset_resources = self.get_resources_by_dandiset(dandiset_id, status)
+                    for res in dandiset_resources:
+                        contributor_email = res.get('annotation_contributor', {}).get('email', '')
                         if contributor_email == user_email:
-                            submission['_dandiset_id'] = dandiset_id
-                            collected.append(submission)
+                            res['_dandiset_id'] = dandiset_id
+                            collected.append(res)
 
             # Sort by annotation_date (newest first)
             collected.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
             return collected
 
         except Exception as e:
-            raise Exception(f"Error loading user {status} submissions: {str(e)}")
+            raise Exception(f"Error loading user {status} resources: {str(e)}")

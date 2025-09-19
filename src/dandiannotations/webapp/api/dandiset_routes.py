@@ -36,17 +36,17 @@ def get_resources_by_status(dandiset_id, status):
 
     Path params:
       - dandiset_id (str)
-      - status: 'community' or 'approved'
+      - status: 'pending' or 'approved'
     Query params:
       - page (int, optional, default=1)
       - per_page (int, optional, default=9)
     """
     # Validate status exactly
-    if status not in {"community", "approved"}:
-        return validation_error_response("Status parameter must be 'community' or 'approved'")
+    if status not in {"pending", "approved"}:
+        return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
-    # Enforce moderator privileges for community
-    if status == "community":
+    # Enforce moderator privileges for pending
+    if status == "pending":
         auth_error = auth_manager.require_moderator()
         if auth_error:
             if auth_error["status_code"] == 401:

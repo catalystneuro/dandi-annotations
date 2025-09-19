@@ -254,7 +254,7 @@ def dandiset_resources(dandiset_id):
         # For community submissions: only moderators get actual data
         if auth_manager.is_moderator():
             community_resp = requests.get(
-                f"{api_base}/api/dandiset/{dandiset_id}/community",
+                f"{api_base}/api/dandiset/{dandiset_id}/pending",
                 params={'page': community_page, 'per_page': per_page},
                 cookies=request.cookies,  # forward session cookie for auth
                 timeout=5
@@ -311,7 +311,7 @@ def moderate():
 
         # Fetch paginated pending submissions for grid (moderator-only)
         resp = requests.get(
-            f"{api_base}/api/moderation/submissions/community",
+            f"{api_base}/api/moderation/submissions/pending",
             params={'page': page, 'per_page': per_page},
             cookies=request.cookies,
             timeout=5
@@ -379,7 +379,7 @@ def approve_submission(dandiset_id, filename):
         # GET: render approval form (fetches pending submission via moderation API)
         try:
             resp = requests.get(
-                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/community",
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/pending",
                 cookies=request.cookies,
                 timeout=5,
             )
@@ -473,7 +473,7 @@ def delete_submission(dandiset_id, filename, status):
         return redirect(url_for('index'))
 
     # Optional quick UX check; canonical validation happens in the API/service
-    if status not in ['community', 'approved']:
+    if status not in ['pending', 'approved']:
         flash("Invalid submission status", 'error')
         return redirect(url_for('moderate'))
 
@@ -509,7 +509,7 @@ def delete_submission(dandiset_id, filename, status):
             data = resp_json.get('data', {})
             resource_name = data.get('resource_name', filename)
             display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-            status_text = "pending" if status == 'community' else "approved"
+            status_text = "pending" if status == 'pending' else "approved"
             flash(f"Successfully deleted {status_text} submission \"{resource_name}\" for {display_id}", 'success')
         else:
             try:
@@ -623,9 +623,9 @@ def my_submissions():
 
         api_base = request.host_url.rstrip('/')
 
-        # Call the split API endpoints for user submissions
+        # Call the unified API endpoints for user resources
         community_resp = requests.get(
-            f"{api_base}/api/submissions/user/{user_email}/community",
+            f"{api_base}/api/resources/user/{user_email}/pending",
             params={
                 'page': community_page,
                 'per_page': per_page
@@ -634,7 +634,7 @@ def my_submissions():
             timeout=10
         )
         approved_resp = requests.get(
-            f"{api_base}/api/submissions/user/{user_email}/approved",
+            f"{api_base}/api/resources/user/{user_email}/approved",
             params={
                 'page': approved_page,
                 'per_page': per_page

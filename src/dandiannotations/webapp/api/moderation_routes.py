@@ -36,7 +36,7 @@ auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
 
 
 @moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/<status>", methods=["GET"])
-@handle_api_errors("Failed to retrieve submission")
+@handle_api_errors("Failed to retrieve resource")
 def get_submission_by_status(dandiset_id, filename, status):
     """
     GET /api/moderation/submissions/{dandiset_id}/{filename}/{status}
@@ -51,8 +51,8 @@ def get_submission_by_status(dandiset_id, filename, status):
             return forbidden_response(auth_error["error"])
 
     # Validate status
-    if status not in {"community", "approved"}:
-        return validation_error_response("Status parameter must be 'community' or 'approved'")
+    if status not in {"pending", "approved"}:
+        return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     try:
         submission = resource_service.get_submission_by_filename(dandiset_id, filename, status)
@@ -66,11 +66,11 @@ def get_submission_by_status(dandiset_id, filename, status):
 
 
 @moderation_api_bp.route("/submissions/<status>", methods=["GET"])
-@handle_api_errors("Failed to retrieve submissions")
+@handle_api_errors("Failed to retrieve resources")
 def get_submissions_by_status(status):
     """
     GET /api/moderation/submissions/{status}
-    Get all submissions across all dandisets by status (moderator only)
+    Get all resources across all dandisets by status (moderator only)
     """
     # Check moderator privileges
     auth_error = auth_manager.require_moderator()
@@ -81,8 +81,8 @@ def get_submissions_by_status(status):
             return forbidden_response(auth_error["error"])
 
     # Validate status
-    if status not in {"community", "approved"}:
-        return validation_error_response("Status parameter must be 'community' or 'approved'")
+    if status not in {"pending", "approved"}:
+        return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     # Pagination params
     page = request.args.get("page", 1, type=int)
@@ -93,7 +93,7 @@ def get_submissions_by_status(status):
 
     return success_response(
         data=items,
-        message=f"{status.capitalize()} submissions retrieved successfully",
+        message=f"{status.capitalize()} resources retrieved successfully",
         pagination=pagination
     )
 
@@ -101,7 +101,7 @@ def get_submissions_by_status(status):
 
 
 @moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/<status>", methods=["DELETE"])
-@handle_api_errors("Failed to delete submission")
+@handle_api_errors("Failed to delete resource")
 def delete_submission(dandiset_id, filename, status):
     """
     DELETE /api/moderation/submissions/{dandiset_id}/{filename}/{status}
@@ -116,8 +116,8 @@ def delete_submission(dandiset_id, filename, status):
             return forbidden_response(auth_error["error"])
 
     # Validate status
-    if status not in {"community", "approved"}:
-        return validation_error_response("Status parameter must be 'community' or 'approved'")
+    if status not in {"pending", "approved"}:
+        return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     # Minimal HTTP checks (content type + JSON presence for moderator info)
     is_valid, error_msg = validate_content_type()
@@ -139,7 +139,7 @@ def delete_submission(dandiset_id, filename, status):
 
 
 @moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/approve", methods=["POST"])
-@handle_api_errors("Failed to approve submission")
+@handle_api_errors("Failed to approve resource")
 def approve_submission(dandiset_id, filename):
     """
     POST /api/moderation/submissions/{dandiset_id}/{filename}/approve
