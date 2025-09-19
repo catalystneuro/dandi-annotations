@@ -29,5 +29,3 @@
 7) Remove excessive try-except blocks
 
 8) Clarify naming: resource vs submission, pending vs community
-
-9) Propagate 'status' as a parameter for service layer and REST API layer
