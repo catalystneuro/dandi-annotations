@@ -98,6 +98,72 @@ class ResourceService:
     def __init__(self, repository: ResourceRepository):
         self.repo = repository
 
+    # ---------------------------
+    # Validation helpers (service-layer validation)
+    # ---------------------------
+    def _validate_dandiset_id(self, dandiset_id: str) -> None:
+        """
+        Validate dandiset ID format: either 6 digits (000001) or 'dandiset_000001'.
+        Raises ValueError on invalid input.
+        """
+        if not dandiset_id:
+            raise ValueError("Dandiset ID is required")
+        pattern = r'^(dandiset_)?[0-9]{6}$'
+        if not re.match(pattern, dandiset_id):
+            raise ValueError("Invalid dandiset ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)")
+
+    def _validate_email(self, email: Optional[str]) -> None:
+        if not email:
+            raise ValueError("Moderator email is required")
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, email):
+            raise ValueError("Invalid moderator email format")
+
+    def _validate_url(self, url: Optional[str]) -> None:
+        if not url:
+            return
+        pattern = r'^https?://[^\s/$.?#].[^\s]*$'
+        if not re.match(pattern, url):
+            raise ValueError("Invalid moderator URL format. Must start with http:// or https://")
+
+    def _validate_orcid(self, orcid: Optional[str]) -> None:
+        if not orcid:
+            return
+        pattern = r'^https://orcid\.org/\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
+        if not re.match(pattern, orcid):
+            raise ValueError("Invalid moderator ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000")
+
+    def _validate_status(self, status: str) -> None:
+        """
+        Validate submission status.
+        """
+        if status not in {"community", "approved"}:
+            raise ValueError("Status parameter must be 'community' or 'approved'")
+
+    # ---------------------------
+    # Serialization helper (service-layer serialization)
+    # ---------------------------
+    def _serialize_resource(self, resource: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Normalize a resource dict for API/UI consumption (lightweight serializer).
+        - Ensures dandiset_id key exists (from _dandiset_id)
+        - Adds id derived from filename if not present
+        """
+        if not resource:
+            return None
+        serialized = dict(resource)
+        if '_dandiset_id' in serialized and 'dandiset_id' not in serialized:
+            serialized['dandiset_id'] = serialized.get('_dandiset_id')
+        if '_submission_filename' in serialized and 'id' not in serialized:
+            try:
+                serialized['id'] = serialized['_submission_filename'].replace('.yaml', '')
+            except Exception:
+                pass
+        return serialized
+
+    # ---------------------------
+    # Get high-level stats and listings
+    # ---------------------------
     @paginate
     def get_all_dandisets(self) -> List[Dict[str, Any]]:
         """
@@ -186,6 +252,98 @@ class ResourceService:
             'unique_contributors': unique_contributors,
         }
 
+    def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
+        """
+        Return detailed statistics for a specific dandiset.
+        Computed from approved + community lists to avoid brittle existence checks.
+        """
+        # Fetch lists using repository helpers (these tolerate missing dirs)
+        approved_submissions = self.repo.get_submissions_by_dandiset(dandiset_id, 'approved')
+        community_submissions = self.repo.get_submissions_by_dandiset(dandiset_id, 'community')
+
+        # Build display ID
+        display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+
+        # Aggregate counts
+        approved_count = len(approved_submissions)
+        pending_count = len(community_submissions)
+        total_count = approved_count + pending_count
+
+        # Unique contributors across both lists
+        unique_contributors = len({
+            sub.get('annotation_contributor', {}).get('name')
+            for sub in approved_submissions + community_submissions
+            if sub.get('annotation_contributor', {}).get('name')
+        })
+
+        # Breakdown counts
+        resource_types = {}
+        repositories = {}
+        for sub in approved_submissions + community_submissions:
+            rt = sub.get('resourceType', 'Unknown')
+            repo = sub.get('repository', 'Unknown')
+            resource_types[rt] = resource_types.get(rt, 0) + 1
+            repositories[repo] = repositories.get(repo, 0) + 1
+
+        return {
+            'dandiset_id': dandiset_id,
+            'display_id': display_id,
+            'approved_count': approved_count,
+            'pending_count': pending_count,
+            'total_count': total_count,
+            'unique_contributors': unique_contributors,
+            'resource_types': resource_types,
+            'repositories': repositories
+        }
+
+    # ---------------------------
+    # Get resource by dandiset, user, filename, or all
+    # ---------------------------
+    @paginate
+    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
+        """
+        Return resources for a dandiset by status ('community' or 'approved').
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        self._validate_dandiset_id(dandiset_id)
+        self._validate_status(status)
+        return self.repo.get_submissions_by_dandiset(dandiset_id, status)
+
+
+    @paginate
+    def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
+        """
+        Return all resources across all dandisets for a given status.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        self._validate_status(status)
+        return self.repo.get_all_submissions(status)
+
+
+    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str) -> Optional[Dict[str, Any]]:
+        """
+        Validate input and return a submission by filename and status (serialized).
+        """
+        self._validate_dandiset_id(dandiset_id)
+        self._validate_status(status)
+        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status)
+        return self._serialize_resource(submission)
+
+    @paginate
+    def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
+        """
+        Return resources for a user by status.
+
+        When called with kwargs page/per_page, returns (items, pagination_info).
+        """
+        self._validate_status(status)
+        return self.repo.get_submissions_by_user(user_email, status)
+
+    # ---------------------------
+    # Submission management (create/approve/delete)
+    # ---------------------------
     def submit_resource(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate and save a new community submission.
@@ -248,106 +406,7 @@ class ResourceService:
             'status': 'pending',
             'resource': resource_data,
         }
-
-    @paginate
-    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
-        """
-        Return resources for a dandiset by status ('community' or 'approved').
-
-        When called with kwargs page/per_page, returns (items, pagination_info).
-        """
-        self._validate_dandiset_id(dandiset_id)
-        self._validate_status(status)
-        return self.repo.get_submissions_by_dandiset(dandiset_id, status)
-
-
-    @paginate
-    def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
-        """
-        Return all resources across all dandisets for a given status.
-
-        When called with kwargs page/per_page, returns (items, pagination_info).
-        """
-        self._validate_status(status)
-        return self.repo.get_all_submissions(status)
-
-
-    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str) -> Optional[Dict[str, Any]]:
-        """
-        Validate input and return a submission by filename and status (serialized).
-        """
-        self._validate_dandiset_id(dandiset_id)
-        self._validate_status(status)
-        submission = self.repo.get_submission_by_filename(dandiset_id, filename, status)
-        return self._serialize_resource(submission)
-
-    # ---------------------------
-    # Validation helpers (service-layer validation)
-    # ---------------------------
-    def _validate_dandiset_id(self, dandiset_id: str) -> None:
-        """
-        Validate dandiset ID format: either 6 digits (000001) or 'dandiset_000001'.
-        Raises ValueError on invalid input.
-        """
-        if not dandiset_id:
-            raise ValueError("Dandiset ID is required")
-        pattern = r'^(dandiset_)?[0-9]{6}$'
-        if not re.match(pattern, dandiset_id):
-            raise ValueError("Invalid dandiset ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)")
-
-    def _validate_email(self, email: Optional[str]) -> None:
-        if not email:
-            raise ValueError("Moderator email is required")
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(pattern, email):
-            raise ValueError("Invalid moderator email format")
-
-    def _validate_url(self, url: Optional[str]) -> None:
-        if not url:
-            return
-        pattern = r'^https?://[^\s/$.?#].[^\s]*$'
-        if not re.match(pattern, url):
-            raise ValueError("Invalid moderator URL format. Must start with http:// or https://")
-
-    def _validate_orcid(self, orcid: Optional[str]) -> None:
-        if not orcid:
-            return
-        pattern = r'^https://orcid\.org/\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
-        if not re.match(pattern, orcid):
-            raise ValueError("Invalid moderator ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000")
-
-    def _validate_status(self, status: str) -> None:
-        """
-        Validate submission status.
-        """
-        if status not in {"community", "approved"}:
-            raise ValueError("Status parameter must be 'community' or 'approved'")
-
-    # ---------------------------
-    # Serialization helper (service-layer serialization)
-    # ---------------------------
-    def _serialize_resource(self, resource: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """
-        Normalize a resource dict for API/UI consumption (lightweight serializer).
-        - Ensures dandiset_id key exists (from _dandiset_id)
-        - Adds id derived from filename if not present
-        """
-        if not resource:
-            return None
-        serialized = dict(resource)
-        if '_dandiset_id' in serialized and 'dandiset_id' not in serialized:
-            serialized['dandiset_id'] = serialized.get('_dandiset_id')
-        if '_submission_filename' in serialized and 'id' not in serialized:
-            try:
-                serialized['id'] = serialized['_submission_filename'].replace('.yaml', '')
-            except Exception:
-                pass
-        return serialized
-
-    # ---------------------------
-    # Moderation: GET pending submission (with validation + serialization)
-    # ---------------------------
-
+    
     def approve_submission(self, dandiset_id: str, filename: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate moderator payload, approve the pending submission, and return the approved record (serialized).
@@ -452,59 +511,4 @@ class ResourceService:
             'resource_name': resource_name,
             'deleted_by': name,
             'deletion_date': deletion_date,
-        }
-
-    @paginate
-    def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
-        """
-        Return resources for a user by status.
-
-        When called with kwargs page/per_page, returns (items, pagination_info).
-        """
-        self._validate_status(status)
-        return self.repo.get_submissions_by_user(user_email, status)
-
-
-    def get_dandiset_stats(self, dandiset_id: str) -> Dict[str, Any]:
-        """
-        Return detailed statistics for a specific dandiset.
-        Computed from approved + community lists to avoid brittle existence checks.
-        """
-        # Fetch lists using repository helpers (these tolerate missing dirs)
-        approved_submissions = self.repo.get_submissions_by_dandiset(dandiset_id, 'approved')
-        community_submissions = self.repo.get_submissions_by_dandiset(dandiset_id, 'community')
-
-        # Build display ID
-        display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-
-        # Aggregate counts
-        approved_count = len(approved_submissions)
-        pending_count = len(community_submissions)
-        total_count = approved_count + pending_count
-
-        # Unique contributors across both lists
-        unique_contributors = len({
-            sub.get('annotation_contributor', {}).get('name')
-            for sub in approved_submissions + community_submissions
-            if sub.get('annotation_contributor', {}).get('name')
-        })
-
-        # Breakdown counts
-        resource_types = {}
-        repositories = {}
-        for sub in approved_submissions + community_submissions:
-            rt = sub.get('resourceType', 'Unknown')
-            repo = sub.get('repository', 'Unknown')
-            resource_types[rt] = resource_types.get(rt, 0) + 1
-            repositories[repo] = repositories.get(repo, 0) + 1
-
-        return {
-            'dandiset_id': dandiset_id,
-            'display_id': display_id,
-            'approved_count': approved_count,
-            'pending_count': pending_count,
-            'total_count': total_count,
-            'unique_contributors': unique_contributors,
-            'resource_types': resource_types,
-            'repositories': repositories
         }
