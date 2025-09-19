@@ -8,7 +8,7 @@ from pathlib import Path
 import uuid
 
 # Import for type hinting
-from dandiannotations.models.models import ExternalResource
+from dandiannotations.models.models import ExternalResource, AnnotationContributor
 
 
 class ResourceRepository:
@@ -73,7 +73,7 @@ class ResourceRepository:
 
         return resource_id
 
-    def approve_submission(self, dandiset_id: str, filename: str, approver_info: Dict[str, Any]) -> bool:
+    def approve_submission(self, dandiset_id: str, filename: str, approver: AnnotationContributor) -> bool:
         """
         Move a submission from pending to approved folder and add approval information
 
@@ -98,23 +98,19 @@ class ResourceRepository:
             if dest_path.exists():
                 raise FileExistsError(f"File already exists in approved folder: {filename}")
 
-            # Load the existing submission data
+            # Load and validate the existing submission as ExternalResource
             with open(source_path, 'r', encoding='utf-8') as file:
-                submission_data = yaml.safe_load(file)
+                submission_data = yaml.safe_load(file) or {}
+            resource = ExternalResource.model_validate(submission_data)
 
-            # Add approval information
-            submission_data['approval_contributor'] = {
-                'name': approver_info.get('name', 'Unknown Moderator'),
-                'email': approver_info.get('email'),
-                'identifier': approver_info.get('identifier'),
-                'url': approver_info.get('url'),
-                'schemaKey': 'AnnotationContributor'
-            }
-            submission_data['approval_date'] = datetime.now().astimezone().isoformat()
+            # Set approval fields using Pydantic models
+            resource.approval_contributor = approver
+            resource.approval_date = datetime.now().astimezone()
 
             # Save the updated data to the approved folder
+            updated_data = resource.model_dump(mode='json', exclude_none=True)
             with open(dest_path, 'w', encoding='utf-8') as file:
-                yaml.dump(submission_data, file, default_flow_style=False,
+                yaml.dump(updated_data, file, default_flow_style=False,
                          allow_unicode=True, sort_keys=False, indent=2)
 
             # Remove the original file from pending folder

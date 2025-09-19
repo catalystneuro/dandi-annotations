@@ -420,7 +420,7 @@ class ResourceService:
         # Validate dandiset_id
         self._validate_dandiset_id(dandiset_id)
 
-        # Extract and validate moderator fields
+        # Extract moderator fields and validate via Pydantic model
         name = (data or {}).get('moderator_name', '').strip()
         email = (data or {}).get('moderator_email', '').strip()
         identifier = (data or {}).get('moderator_identifier', '').strip() if data else None
@@ -428,15 +428,17 @@ class ResourceService:
 
         if not name:
             raise ValueError("Moderator name is required")
-        self._validate_email(email)
-        self._validate_orcid(identifier)
-        self._validate_url(url_field)
 
-        moderator_info = {'name': name, 'email': email}
-        if identifier:
-            moderator_info['identifier'] = identifier
-        if url_field:
-            moderator_info['url'] = url_field
+        try:
+            approver = AnnotationContributor(
+                name=name,
+                email=email,
+                identifier=identifier or None,
+                url=url_field or None,
+            )
+        except Exception as e:
+            # Normalize Pydantic validation errors to ValueError for route handling
+            raise ValueError(f"Validation error: {str(e)}")
 
         # Ensure the pending submission exists before attempting approval
         pending = self.repo.get_resource_by_filename(dandiset_id, filename, "pending")
@@ -445,7 +447,7 @@ class ResourceService:
             raise FileNotFoundError("Submission not found")
 
         # Approve via repository
-        success = self.repo.approve_submission(dandiset_id, filename, moderator_info)
+        success = self.repo.approve_submission(dandiset_id, filename, approver)
         if not success:
             raise Exception("Approval failed")
 
