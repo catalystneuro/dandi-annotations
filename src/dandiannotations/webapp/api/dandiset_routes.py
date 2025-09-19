@@ -2,14 +2,13 @@
 Minimal API routes for per-dandiset resources.
 
 Provides:
-- GET /api/dandiset/<dandiset_id>/approved   -> paginated list of approved resources
-- GET /api/dandiset/<dandiset_id>/community  -> paginated list of community (pending) resources (moderator only)
-- GET /api/dandiset/<dandiset_id>/overview  -> per-dandiset statistics
+- GET /api/dandiset/<dandiset_id>/<status>  -> paginated list of resources by status
+- GET /api/dandiset/<dandiset_id>/overview      -> per-dandiset statistics
 
 Backed by ResourceService/ResourceRepository (new architecture).
 """
 from flask import Blueprint, request
-from .responses import success_response, unauthorized_response, forbidden_response
+from .responses import success_response, unauthorized_response, forbidden_response, validation_error_response
 from .decorators import handle_api_errors
 import os
 
@@ -29,48 +28,41 @@ MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config",
 auth_manager = AuthManager(MODERATORS_CONFIG_PATH)
 
 
-@dandiset_api_bp.route("/<dandiset_id>/approved", methods=["GET"])
-@handle_api_errors("Failed to retrieve approved resources")
-def get_approved_resources(dandiset_id):
+@dandiset_api_bp.route("/<dandiset_id>/<status>", methods=["GET"])
+@handle_api_errors("Failed to retrieve resources")
+def get_resources_by_status(dandiset_id, status):
     """
-    Return paginated approved resources for a dandiset.
+    Return paginated resources for a dandiset and status.
 
-    Query params:
-    - page (int, optional, default=1)
-    - per_page (int, optional, default=9)
-    """
-    page = request.args.get("page", default=1, type=int)
-    per_page = request.args.get("per_page", default=9, type=int)
-
-    items, pagination = resource_service.get_resources_by_dandiset(dandiset_id, 'approved', page=page, per_page=per_page)
-    return success_response(data=items, pagination=pagination, message="Approved resources retrieved successfully.")
-
-
-@dandiset_api_bp.route("/<dandiset_id>/community", methods=["GET"])
-@handle_api_errors("Failed to retrieve community resources")
-def get_community_resources(dandiset_id):
-    """
-    Return paginated community (pending) resources for a dandiset.
-
-    Auth:
-      - Moderator only
+    Path params:
+      - dandiset_id (str)
+      - status: 'community' or 'approved'
     Query params:
       - page (int, optional, default=1)
       - per_page (int, optional, default=9)
     """
-    # Enforce moderator privileges
-    auth_error = auth_manager.require_moderator()
-    if auth_error:
-        if auth_error["status_code"] == 401:
-            return unauthorized_response(auth_error["error"])
-        else:
-            return forbidden_response(auth_error["error"])
+    # Validate status exactly
+    if status not in {"community", "approved"}:
+        return validation_error_response("Status parameter must be 'community' or 'approved'")
+
+    # Enforce moderator privileges for community
+    if status == "community":
+        auth_error = auth_manager.require_moderator()
+        if auth_error:
+            if auth_error["status_code"] == 401:
+                return unauthorized_response(auth_error["error"])
+            else:
+                return forbidden_response(auth_error["error"])
 
     page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=9, type=int)
 
-    items, pagination = resource_service.get_resources_by_dandiset(dandiset_id, 'community', page=page, per_page=per_page)
-    return success_response(data=items, pagination=pagination, message="Community resources retrieved successfully.")
+    items, pagination = resource_service.get_resources_by_dandiset(dandiset_id, status, page=page, per_page=per_page)
+    return success_response(
+        data=items,
+        pagination=pagination,
+        message=f"{status.capitalize()} resources retrieved successfully."
+    )
 
 
 @dandiset_api_bp.route("/<dandiset_id>/overview", methods=["GET"])

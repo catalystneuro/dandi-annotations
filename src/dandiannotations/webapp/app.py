@@ -311,7 +311,7 @@ def moderate():
 
         # Fetch paginated pending submissions for grid (moderator-only)
         resp = requests.get(
-            f"{api_base}/api/moderation/submissions/pending",
+            f"{api_base}/api/moderation/submissions/community",
             params={'page': page, 'per_page': per_page},
             cookies=request.cookies,
             timeout=5
@@ -379,7 +379,7 @@ def approve_submission(dandiset_id, filename):
         # GET: render approval form (fetches pending submission via moderation API)
         try:
             resp = requests.get(
-                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}",
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/community",
                 cookies=request.cookies,
                 timeout=5,
             )
@@ -497,8 +497,7 @@ def delete_submission(dandiset_id, filename, status):
 
         # Call the moderation DELETE API
         resp = requests.delete(
-            f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}",
-            params={'status': status},
+            f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/{status}",
             json=payload,
             headers={'Content-Type': 'application/json'},
             cookies=request.cookies,
