@@ -59,11 +59,11 @@ class ResourceRepository:
             external_resource: The ExternalResource Pydantic model to save
 
         Returns:
-            The resource ID of the saved resource
+            The resource UUID (as a string) of the saved resource
         """
         pending_dir = self._get_pending_dir(dandiset_id)
-        resource_id = str(uuid.uuid4())
-        filename = f"{resource_id}.yaml"
+        resource_uuid = str(external_resource.uuid)
+        filename = f"{resource_uuid}.yaml"
         filepath = pending_dir / filename
 
         # Convert Pydantic model to dict for YAML serialization
@@ -73,7 +73,7 @@ class ResourceRepository:
             yaml.dump(resource_data, file, default_flow_style=False,
                         allow_unicode=True, sort_keys=False, indent=2)
 
-        return resource_id
+        return resource_uuid
 
     def approve_submission(self, dandiset_id: str, filename: str, approver: AnnotationContributor) -> bool:
         """

@@ -35,11 +35,11 @@ MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config",
 auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
 
 
-@moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/<status>", methods=["GET"])
+@moderation_api_bp.route("/submissions/<dandiset_id>/<resource_uuid>/<status>", methods=["GET"])
 @handle_api_errors("Failed to retrieve resource")
-def get_submission_by_status(dandiset_id, filename, status):
+def get_submission_by_status(dandiset_id, resource_uuid, status):
     """
-    GET /api/moderation/submissions/{dandiset_id}/{filename}/{status}
+    GET /api/moderation/submissions/{dandiset_id}/{resource_uuid}/{status}
     Thin route: auth check + delegate to service for validation and serialization.
     """
     # Check moderator privileges
@@ -55,7 +55,8 @@ def get_submission_by_status(dandiset_id, filename, status):
         return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     try:
-        submission = resource_service.get_submission_by_filename(dandiset_id, filename, status)
+        submission_filename = f"{resource_uuid}.yaml"
+        submission = resource_service.get_submission_by_filename(dandiset_id, submission_filename, status)
         if not submission:
             return not_found_response("Submission")
         return success_response(data=submission, message="Submission retrieved successfully")
@@ -100,11 +101,11 @@ def get_submissions_by_status(status):
 
 
 
-@moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/<status>", methods=["DELETE"])
+@moderation_api_bp.route("/submissions/<dandiset_id>/<resource_uuid>/<status>", methods=["DELETE"])
 @handle_api_errors("Failed to delete resource")
-def delete_submission(dandiset_id, filename, status):
+def delete_submission(dandiset_id, resource_uuid, status):
     """
-    DELETE /api/moderation/submissions/{dandiset_id}/{filename}/{status}
+    DELETE /api/moderation/submissions/{dandiset_id}/{resource_uuid}/{status}
     Thin route: auth + minimal HTTP checks; service handles validation and deletion.
     """
     # Check moderator privileges
@@ -129,8 +130,9 @@ def delete_submission(dandiset_id, filename, status):
 
     data = request.get_json() or {}
     try:
-        result = resource_service.delete_submission(dandiset_id, filename, status, data)
-        name = result.get("resource_name", filename)
+        submission_filename = f"{resource_uuid}.yaml"
+        result = resource_service.delete_submission(dandiset_id, submission_filename, status, data)
+        name = result.get("resource_name", resource_uuid)
         return success_response(data=result, message=f"Submission '{name}' deleted successfully")
     except ValueError as e:
         return validation_error_response(str(e))
@@ -138,11 +140,11 @@ def delete_submission(dandiset_id, filename, status):
         return not_found_response("Submission")
 
 
-@moderation_api_bp.route("/submissions/<dandiset_id>/<filename>/approve", methods=["POST"])
+@moderation_api_bp.route("/submissions/<dandiset_id>/<resource_uuid>/approve", methods=["POST"])
 @handle_api_errors("Failed to approve resource")
-def approve_submission(dandiset_id, filename):
+def approve_submission(dandiset_id, resource_uuid):
     """
-    POST /api/moderation/submissions/{dandiset_id}/{filename}/approve
+    POST /api/moderation/submissions/{dandiset_id}/{resource_uuid}/approve
     Thin route: auth + minimal HTTP checks; service handles validation + serialization.
     """
     # Check moderator privileges
@@ -163,7 +165,8 @@ def approve_submission(dandiset_id, filename):
 
     data = request.get_json() or {}
     try:
-        approved = resource_service.approve_submission(dandiset_id, filename, data)
+        submission_filename = f"{resource_uuid}.yaml"
+        approved = resource_service.approve_submission(dandiset_id, submission_filename, data)
         return success_response(data=approved, message="Submission approved successfully")
     except ValueError as e:
         return validation_error_response(str(e))

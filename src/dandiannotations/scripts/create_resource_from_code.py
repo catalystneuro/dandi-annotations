@@ -1,9 +1,11 @@
 from dandiannotations.models.models import AnnotationContributor, ExternalResource
 from dandischema.models import RelationType, ResourceType
 from datetime import datetime
+from uuid import uuid4
 
 def main():
    submitted_resource = ExternalResource(
+       uuid=uuid4(),
        name="TestResource",
        identifier="123",
        dandiset_id="000001",
@@ -18,6 +20,7 @@ def main():
    )
 
    approved_resource = ExternalResource(
+       uuid=uuid4(),
        name="ApprovedResource",
        identifier="456",
        dandiset_id="000001",
@@ -38,6 +41,7 @@ def main():
    )
 
    print("Created annotated resource:")
+   print(f"UUID: {submitted_resource.uuid}")
    print(f"Name: {submitted_resource.name}")
    print(f"Identifier: {submitted_resource.identifier}")
    print(f"Relation: {submitted_resource.relation}")
@@ -46,6 +50,7 @@ def main():
    print(f"Schema Key: {submitted_resource.schemaKey}")
    
    print("\nCreated approved resource:")
+   print(f"UUID: {approved_resource.uuid}")
    print(f"Name: {approved_resource.name}")
    print(f"Identifier: {approved_resource.identifier}")
    print(f"Relation: {approved_resource.relation}")

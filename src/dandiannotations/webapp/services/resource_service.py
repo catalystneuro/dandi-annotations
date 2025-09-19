@@ -154,6 +154,13 @@ class ResourceService:
         serialized = dict(resource)
         if '_dandiset_id' in serialized and 'dandiset_id' not in serialized:
             serialized['dandiset_id'] = serialized.get('_dandiset_id')
+        # Prefer uuid as the stable id if available
+        if 'uuid' in serialized and 'id' not in serialized:
+            try:
+                serialized['id'] = str(serialized['uuid'])
+            except Exception:
+                pass
+        # Legacy fallback: derive id from filename if still present
         if '_submission_filename' in serialized and 'id' not in serialized:
             try:
                 serialized['id'] = serialized['_submission_filename'].replace('.yaml', '')
@@ -374,6 +381,7 @@ class ResourceService:
         
         # Create external resource data
         resource_data = {
+            'uuid': str(uuid.uuid4()),
             'dandiset_id': form_data['dandiset_id'],
             'annotation_date': datetime.now().astimezone().isoformat(),
             'name': form_data['resource_name'],

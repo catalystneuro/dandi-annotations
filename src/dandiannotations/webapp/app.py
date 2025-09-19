@@ -347,9 +347,9 @@ def moderate():
         flash(f'Error loading pending submissions: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/approve/<dandiset_id>/<filename>', methods=['GET', 'POST'])
+@app.route('/approve/<dandiset_id>/<resource_uuid>', methods=['GET', 'POST'])
 @login_required
-def approve_submission(dandiset_id, filename):
+def approve_submission(dandiset_id, resource_uuid):
     """Approve a community submission (UI endpoint combining GET and POST).
 
     GET:
@@ -374,12 +374,13 @@ def approve_submission(dandiset_id, filename):
         return redirect(url_for('index'))
 
     api_base = request.host_url.rstrip('/')
+    submission_filename = f"{resource_uuid}.yaml"
 
     if request.method == 'GET':
         # GET: render approval form (fetches pending submission via moderation API)
         try:
             resp = requests.get(
-                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/pending",
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{submission_filename}/pending",
                 cookies=request.cookies,
                 timeout=5,
             )
@@ -395,7 +396,7 @@ def approve_submission(dandiset_id, filename):
                     'approve_form.html',
                     submission=submission,
                     dandiset_id=dandiset_id,
-                    filename=filename
+                    resource_uuid=resource_uuid
                 )
             else:
                 # Extract error message if available
@@ -422,7 +423,7 @@ def approve_submission(dandiset_id, filename):
             # Minimal presence checks for UX; API performs canonical validation
             if not name or not email:
                 flash('Moderator name and email are required', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, resource_uuid=resource_uuid))
 
             payload = {
                 'moderator_name': name,
@@ -434,7 +435,7 @@ def approve_submission(dandiset_id, filename):
                 payload['moderator_url'] = url_field
 
             resp = requests.post(
-                f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/approve",
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{submission_filename}/approve",
                 json=payload,
                 headers={'Content-Type': 'application/json'},
                 cookies=request.cookies,
@@ -443,7 +444,7 @@ def approve_submission(dandiset_id, filename):
 
             if resp.status_code == 200:
                 data = resp.json().get('data') if resp.headers.get('Content-Type', '').startswith('application/json') else None
-                resource_name = (data or {}).get('name', filename)
+                resource_name = (data or {}).get('name', resource_uuid)
                 display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
                 flash(f'Successfully approved "{resource_name}" for {display_id}', 'success')
             else:
@@ -463,9 +464,9 @@ def approve_submission(dandiset_id, filename):
         # Redirect back to moderation page
         return redirect(url_for('moderate'))
 
-@app.route('/delete/<dandiset_id>/<filename>/<status>', methods=['POST'])
+@app.route('/delete/<dandiset_id>/<resource_uuid>/<status>', methods=['POST'])
 @login_required
-def delete_submission(dandiset_id, filename, status):
+def delete_submission(dandiset_id, resource_uuid, status):
     """Delete a submission with moderator authentication via moderation API"""
     # Require moderator
     if not auth_manager.is_moderator():
@@ -494,10 +495,11 @@ def delete_submission(dandiset_id, filename, status):
             payload['moderator_url'] = current_user.get('url')
 
         api_base = request.host_url.rstrip('/')
+        submission_filename = f"{resource_uuid}.yaml"
 
         # Call the moderation DELETE API
         resp = requests.delete(
-            f"{api_base}/api/moderation/submissions/{dandiset_id}/{filename}/{status}",
+            f"{api_base}/api/moderation/submissions/{dandiset_id}/{submission_filename}/{status}",
             json=payload,
             headers={'Content-Type': 'application/json'},
             cookies=request.cookies,
@@ -507,7 +509,7 @@ def delete_submission(dandiset_id, filename, status):
         if resp.status_code == 200:
             resp_json = resp.json() if resp.headers.get('Content-Type', '').startswith('application/json') else {}
             data = resp_json.get('data', {})
-            resource_name = data.get('resource_name', filename)
+            resource_name = data.get('resource_name', resource_uuid)
             display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
             status_text = "pending" if status == 'pending' else "approved"
             flash(f"Successfully deleted {status_text} submission \"{resource_name}\" for {display_id}", 'success')

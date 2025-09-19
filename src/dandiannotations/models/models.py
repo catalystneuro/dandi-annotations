@@ -3,6 +3,7 @@ from dandischema.models import EmailStr, AnyHttpUrl
 from pydantic import Field, field_validator, ValidationError
 from typing import Literal, Optional
 from datetime import datetime
+from uuid import UUID
 import re
 
 class AnnotationContributor(DandiBaseModel):
@@ -57,6 +58,11 @@ class AnnotationContributor(DandiBaseModel):
         return v
 
 class ExternalResource(Resource):
+    uuid: UUID = Field(
+        title="UUID",
+        description="Programmatic unique identifier for this resource",
+        json_schema_extra={"readOnly": True},
+    )
     dandiset_id: str = Field(
         title="DANDI Set ID",
         description="The DANDI set identifier this resource is associated with (e.g., '000001')"
