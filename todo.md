@@ -9,11 +9,6 @@
 - Services return model_dump outputs from Pydantic models
 - Minimize custom serializers; keep only envelopes/pagination formatting if needed
 
-3) Remove filename dependence above repository
-- Expose a stable resource_id at API/service layers
-- Repository handles filename/storage mapping internally
-- Migrate endpoints/templates to use resource_id; keep filename-based paths temporarily for compatibility and deprecate later
-
 4) Remove Redundant Code
 - Legacy Endpoints in routes.py
 - Unused methods in resource_repository.py
