@@ -13,7 +13,7 @@ when called with `page` and `per_page` keyword arguments.
 import math
 import re
 from datetime import datetime
-from typing import Tuple, List, Dict, Any, Optional, Callable
+from typing import Tuple, List, Dict, Any, Optional, Callable, Union
 from functools import wraps
 import uuid
 
@@ -152,15 +152,21 @@ class ResourceService:
     # ---------------------------
     # Serialization helper (service-layer serialization)
     # ---------------------------
-    def _serialize_resource(self, resource: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _serialize_resource(self, resource: Optional[Union[Dict[str, Any], ExternalResource]]) -> Optional[Dict[str, Any]]:
         """
-        Normalize a resource dict for API/UI consumption (lightweight serializer).
-        - Ensures dandiset_id key exists (from _dandiset_id)
-        - Adds id derived from filename if not present
+        Normalize a resource for API/UI consumption.
+        Accepts either an ExternalResource model or a dict.
+        - Ensures id is derived from uuid if present
+        - Preserves legacy underscored fields when present
         """
-        if not resource:
+        if resource is None:
             return None
-        serialized = dict(resource)
+        # Convert model -> dict if needed
+        if hasattr(resource, "model_dump"):
+            serialized = resource.model_dump(mode="json", exclude_none=True)
+        else:
+            serialized = dict(resource)
+        # Legacy: ensure dandiset_id present if provided under _dandiset_id
         if '_dandiset_id' in serialized and 'dandiset_id' not in serialized:
             serialized['dandiset_id'] = serialized.get('_dandiset_id')
         # Prefer uuid as the stable id if available
@@ -254,7 +260,10 @@ class ResourceService:
             for ds in all_dandisets:
                 if ds.get('pending_count', 0) > 0:
                     for sub in self.repo.get_resources_by_dandiset(ds['id'], 'pending'):
-                        name = sub.get('annotation_contributor', {}).get('name')
+                        try:
+                            name = sub.annotation_contributor.name if sub.annotation_contributor else None
+                        except Exception:
+                            name = None
                         if name:
                             contributor_names.add(name)
             unique_contributors = len(contributor_names)
@@ -287,19 +296,19 @@ class ResourceService:
 
         # Unique contributors across both lists
         unique_contributors = len({
-            sub.get('annotation_contributor', {}).get('name')
+            getattr(sub.annotation_contributor, 'name', None)
             for sub in approved_submissions + pending_submissions
-            if sub.get('annotation_contributor', {}).get('name')
+            if getattr(sub, 'annotation_contributor', None) and getattr(sub.annotation_contributor, 'name', None)
         })
 
         # Breakdown counts
         resource_types = {}
         repositories = {}
         for sub in approved_submissions + pending_submissions:
-            rt = sub.get('resourceType', 'Unknown')
-            repo = sub.get('repository', 'Unknown')
-            resource_types[rt] = resource_types.get(rt, 0) + 1
-            repositories[repo] = repositories.get(repo, 0) + 1
+            resource_type = str(sub.resourceType)
+            repository = str(sub.repository)
+            resource_types[resource_type] = resource_types.get(resource_type, 0) + 1
+            repositories[repository] = repositories.get(repository, 0) + 1
 
         return {
             'dandiset_id': dandiset_id,
@@ -324,7 +333,8 @@ class ResourceService:
         """
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        return self.repo.get_resources_by_dandiset(dandiset_id, status)
+        models = self.repo.get_resources_by_dandiset(dandiset_id, status)
+        return [self._serialize_resource(m) for m in models]
 
 
     @paginate
@@ -335,7 +345,8 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_status(status)
-        return self.repo.get_all_resources(status)
+        models = self.repo.get_all_resources(status)
+        return [self._serialize_resource(m) for m in models]
 
 
     def get_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str) -> Optional[Dict[str, Any]]:
@@ -356,7 +367,8 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_status(status)
-        return self.repo.get_resources_by_user(user_email, status)
+        models = self.repo.get_resources_by_user(user_email, status)
+        return [self._serialize_resource(m) for m in models]
 
     # ---------------------------
     # Submission management (create/approve/delete)
@@ -459,11 +471,8 @@ class ResourceService:
             # Normalize Pydantic validation errors to ValueError for route handling
             raise ValueError(f"Validation error: {str(e)}")
 
-        # Ensure the pending submission exists before attempting approval
-        pending = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, "pending")
-        if not pending:
-            # Let the route decide 404 vs 500 by raising FileNotFoundError
-            raise FileNotFoundError("Submission not found")
+        # Ensure the pending submission exists before attempting approval (will raise if missing)
+        self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, "pending")
 
         # Approve via repository
         success = self.repo.approve_submission(dandiset_id, resource_uuid, approver)
@@ -517,10 +526,7 @@ class ResourceService:
 
         # Load submission pre-delete to capture resource_name
         submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
-        if not submission:
-            raise FileNotFoundError("Submission not found")
-
-        resource_name = submission.get('name', resource_uuid)
+        resource_name = getattr(submission, 'name', resource_uuid)
 
         # Delegate deletion to repository (moves to backup and deletes original)
         success = self.repo.delete_submission(dandiset_id, resource_uuid, status, moderator)

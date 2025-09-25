@@ -174,7 +174,7 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error deleting submission: {str(e)}")
      
-    def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
+    def get_all_resources(self, status: str) -> List[ExternalResource]:
         """
         Get all resources across all dandisets for the given status.
 
@@ -188,7 +188,7 @@ class ResourceRepository:
             if status not in {'pending', 'approved'}:
                 raise ValueError("Invalid status: must be 'pending' or 'approved'")
 
-            all_resources: List[Dict[str, Any]] = []
+            all_resources: List[ExternalResource] = []
 
             # Iterate through all dandiset directories
             for dandiset_dir in self.base_dir.iterdir():
@@ -201,13 +201,13 @@ class ResourceRepository:
                         all_resources.append(res)
 
             # Sort by annotation_date (newest first)
-            all_resources.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            all_resources.sort(key=lambda r: r.annotation_date.isoformat() if getattr(r, 'annotation_date', None) else '', reverse=True)
             return all_resources
 
         except Exception as e:
             raise Exception(f"Error loading all {status} resources: {str(e)}")
 
-    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
+    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[ExternalResource]:
         """
         Get resources for a dandiset by status.
 
@@ -223,15 +223,14 @@ class ResourceRepository:
                 raise ValueError("Invalid status: must be 'pending' or 'approved'")
 
             target_dir = self._get_pending_dir(dandiset_id) if status == 'pending' else self._get_approved_dir(dandiset_id)
-            resources: List[Dict[str, Any]] = []
+            resources: List[ExternalResource] = []
 
             for yaml_file in target_dir.glob("*.yaml"):
                 try:
                     with open(yaml_file, 'r', encoding='utf-8') as file:
                         loaded = yaml.safe_load(file) or {}
                     resource = ExternalResource.model_validate(loaded)
-                    item = resource.model_dump(mode='json', exclude_none=True)
-                    resources.append(item)
+                    resources.append(resource)
                 except ValidationError as e:
                     print(f"Validation error in {yaml_file}: {e}")
                     continue
@@ -243,32 +242,39 @@ class ResourceRepository:
                     continue
 
             # Sort by annotation_date (newest first)
-            resources.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            resources.sort(key=lambda r: r.annotation_date.isoformat() if getattr(r, 'annotation_date', None) else '', reverse=True)
             return resources
         except Exception as e:
             raise Exception(f"Error loading {status} resources: {str(e)}")
 
-    def get_resource_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str = 'pending') -> Optional[Dict[str, Any]]:
+    def get_resource_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str = 'pending') -> ExternalResource:
         """
         Get a specific resource by UUID.
+
+        Returns:
+            ExternalResource
+
+        Raises:
+            FileNotFoundError: If the resource YAML does not exist.
+            Exception: If an error occurs while reading or validating the YAML.
         """
         try:
             filepath = self._get_resource_path(dandiset_id, status, resource_uuid)
 
             if not filepath.exists():
-                return None
+                raise FileNotFoundError(f"Submission file not found: {resource_uuid}.yaml")
 
             with open(filepath, 'r', encoding='utf-8') as file:
                 loaded = yaml.safe_load(file) or {}
             resource = ExternalResource.model_validate(loaded)
-            data = resource.model_dump(mode='json', exclude_none=True)
-            return data
+            return resource
 
+        except FileNotFoundError:
+            raise
         except Exception as e:
-            print(f"Error loading resource {resource_uuid}: {e}")
-            return None
+            raise Exception(f"Error loading resource {resource_uuid}: {str(e)}")
 
-    def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
+    def get_resources_by_user(self, user_email: str, status: str) -> List[ExternalResource]:
         """
         Get resources for a specific user by status across all dandisets.
 
@@ -283,7 +289,7 @@ class ResourceRepository:
             if status not in {'pending', 'approved'}:
                 raise ValueError("Invalid status: must be 'pending' or 'approved'")
 
-            collected: List[Dict[str, Any]] = []
+            collected: List[ExternalResource] = []
 
             # Iterate through all dandiset directories
             for dandiset_dir in self.base_dir.iterdir():
@@ -293,12 +299,15 @@ class ResourceRepository:
                     # Get resources for this dandiset by status
                     dandiset_resources = self.get_resources_by_dandiset(dandiset_id, status)
                     for res in dandiset_resources:
-                        contributor_email = res.get('annotation_contributor', {}).get('email', '')
+                        try:
+                            contributor_email = str(res.annotation_contributor.email)
+                        except Exception:
+                            contributor_email = ''
                         if contributor_email == user_email:
                             collected.append(res)
 
             # Sort by annotation_date (newest first)
-            collected.sort(key=lambda x: x.get('annotation_date', ''), reverse=True)
+            collected.sort(key=lambda r: r.annotation_date.isoformat() if getattr(r, 'annotation_date', None) else '', reverse=True)
             return collected
 
         except Exception as e:

@@ -102,8 +102,8 @@
                                 <div class="card-body">
                                     <p class="card-text">
                                         <strong>DANDI Set:</strong> 
-                                        <a href="{{ url_for('dandiset_resources', dandiset_id=resource._dandiset_id) }}" class="text-decoration-none">
-                                            DANDI:{{ resource._dandiset_id.split('_')[1] if '_' in resource._dandiset_id else resource._dandiset_id.zfill(6) }}
+                                        <a href="{{ url_for('dandiset_resources', dandiset_id='dandiset_' ~ resource.dandiset_id) }}" class="text-decoration-none">
+                                            DANDI:{{ resource.dandiset_id }}
                                         </a>
                                     </p>
                                     <p class="card-text">
@@ -201,8 +201,8 @@
                                 <div class="card-body">
                                     <p class="card-text">
                                         <strong>DANDI Set:</strong> 
-                                        <a href="{{ url_for('dandiset_resources', dandiset_id=resource._dandiset_id) }}" class="text-decoration-none">
-                                            DANDI:{{ resource._dandiset_id.split('_')[1] if '_' in resource._dandiset_id else resource._dandiset_id.zfill(6) }}
+                                        <a href="{{ url_for('dandiset_resources', dandiset_id='dandiset_' ~ resource.dandiset_id) }}" class="text-decoration-none">
+                                            DANDI:{{ resource.dandiset_id }}
                                         </a>
                                     </p>
                                     <p class="card-text">
