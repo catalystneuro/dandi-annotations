@@ -94,6 +94,26 @@ def paginate(func: Callable) -> Callable:
     return wrapper
 
 
+def _serialize_resources(result: Union[ExternalResource, List[ExternalResource]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Serialize ExternalResource or List[ExternalResource] to dict(s) using model_dump.
+    Assumes Pydantic v2 models and valid inputs (no legacy transforms).
+    """
+    if isinstance(result, list):
+        return [obj.model_dump(mode="json", exclude_none=True) for obj in result]
+    return result.model_dump(mode="json", exclude_none=True)
+
+
+def serialize_resources(func: Callable[..., Union[ExternalResource, List[ExternalResource]]]) -> Callable[..., Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    """
+    Decorator: serialize service-layer results (ExternalResource or list thereof) to dict(s).
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return _serialize_resources(func(*args, **kwargs))
+    return wrapper
+
+
 class ResourceService:
     def __init__(self, repository: ResourceRepository):
         self.repo = repository
@@ -149,39 +169,6 @@ class ResourceService:
         except Exception:
             raise ValueError("Invalid UUID format")
 
-    # ---------------------------
-    # Serialization helper (service-layer serialization)
-    # ---------------------------
-    def _serialize_resource(self, resource: Optional[Union[Dict[str, Any], ExternalResource]]) -> Optional[Dict[str, Any]]:
-        """
-        Normalize a resource for API/UI consumption.
-        Accepts either an ExternalResource model or a dict.
-        - Ensures id is derived from uuid if present
-        - Preserves legacy underscored fields when present
-        """
-        if resource is None:
-            return None
-        # Convert model -> dict if needed
-        if hasattr(resource, "model_dump"):
-            serialized = resource.model_dump(mode="json", exclude_none=True)
-        else:
-            serialized = dict(resource)
-        # Legacy: ensure dandiset_id present if provided under _dandiset_id
-        if '_dandiset_id' in serialized and 'dandiset_id' not in serialized:
-            serialized['dandiset_id'] = serialized.get('_dandiset_id')
-        # Prefer uuid as the stable id if available
-        if 'uuid' in serialized and 'id' not in serialized:
-            try:
-                serialized['id'] = str(serialized['uuid'])
-            except Exception:
-                pass
-        # Legacy fallback: derive id from filename if still present
-        if '_submission_filename' in serialized and 'id' not in serialized:
-            try:
-                serialized['id'] = serialized['_submission_filename'].replace('.yaml', '')
-            except Exception:
-                pass
-        return serialized
 
     # ---------------------------
     # Get high-level stats and listings
@@ -325,6 +312,7 @@ class ResourceService:
     # Get resource by dandiset, user, uuid, or all
     # ---------------------------
     @paginate
+    @serialize_resources
     def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
         """
         Return resources for a dandiset by status ('pending' or 'approved').
@@ -333,11 +321,11 @@ class ResourceService:
         """
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        models = self.repo.get_resources_by_dandiset(dandiset_id, status)
-        return [self._serialize_resource(m) for m in models]
+        return self.repo.get_resources_by_dandiset(dandiset_id, status)
 
 
     @paginate
+    @serialize_resources
     def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
         """
         Return all resources across all dandisets for a given status.
@@ -345,10 +333,10 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_status(status)
-        models = self.repo.get_all_resources(status)
-        return [self._serialize_resource(m) for m in models]
+        return self.repo.get_all_resources(status)
 
 
+    @serialize_resources
     def get_resource_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str) -> Optional[Dict[str, Any]]:
         """
         Validate input and return a resource by UUID and status (serialized).
@@ -357,9 +345,10 @@ class ResourceService:
         self._validate_status(status)
         self._validate_uuid(resource_uuid)
         submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
-        return self._serialize_resource(submission)
+        return submission
 
     @paginate
+    @serialize_resources
     def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
         """
         Return resources for a user by status.
@@ -367,8 +356,7 @@ class ResourceService:
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
         self._validate_status(status)
-        models = self.repo.get_resources_by_user(user_email, status)
-        return [self._serialize_resource(m) for m in models]
+        return self.repo.get_resources_by_user(user_email, status)
 
     # ---------------------------
     # Submission management (create/approve/delete)
@@ -437,6 +425,7 @@ class ResourceService:
             'resource': resource_data,
         }
     
+    @serialize_resources
     def approve_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate moderator payload, approve the pending submission by UUID, and return the approved record (serialized).
@@ -480,7 +469,7 @@ class ResourceService:
             raise Exception("Approval failed")
 
         approved = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, "approved")
-        return self._serialize_resource(approved)
+        return approved
 
     def delete_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
