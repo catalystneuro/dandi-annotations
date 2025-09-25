@@ -355,14 +355,14 @@ def approve_submission(dandiset_id, resource_uuid):
     GET:
     - Renders the moderation approval form for the specified submission.
     - Requires authenticated moderator.
-    - Retrieves the pending submission via /api/moderation/submissions/{dandiset_id}/{filename}.
+    - Retrieves the pending submission via /api/moderation/submissions/{dandiset_id}/{resource_uuid}.
     - Prefills moderator name/email from the current session.
 
     POST:
     - Submits approval for the specified submission.
     - Requires authenticated moderator.
     - Forwards JSON payload (moderator_name, moderator_email, optional identifier/url) to
-      /api/moderation/submissions/{dandiset_id}/{filename}/approve.
+      /api/moderation/submissions/{dandiset_id}/{resource_uuid}/approve.
     - Parses API response, flashes success/error, then redirects to /moderate.
 
     Notes:
@@ -374,13 +374,12 @@ def approve_submission(dandiset_id, resource_uuid):
         return redirect(url_for('index'))
 
     api_base = request.host_url.rstrip('/')
-    submission_filename = f"{resource_uuid}.yaml"
 
     if request.method == 'GET':
         # GET: render approval form (fetches pending submission via moderation API)
         try:
             resp = requests.get(
-                f"{api_base}/api/moderation/submissions/{dandiset_id}/{submission_filename}/pending",
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{resource_uuid}/pending",
                 cookies=request.cookies,
                 timeout=5,
             )
@@ -435,7 +434,7 @@ def approve_submission(dandiset_id, resource_uuid):
                 payload['moderator_url'] = url_field
 
             resp = requests.post(
-                f"{api_base}/api/moderation/submissions/{dandiset_id}/{submission_filename}/approve",
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{resource_uuid}/approve",
                 json=payload,
                 headers={'Content-Type': 'application/json'},
                 cookies=request.cookies,
@@ -495,11 +494,10 @@ def delete_submission(dandiset_id, resource_uuid, status):
             payload['moderator_url'] = current_user.get('url')
 
         api_base = request.host_url.rstrip('/')
-        submission_filename = f"{resource_uuid}.yaml"
 
         # Call the moderation DELETE API
         resp = requests.delete(
-            f"{api_base}/api/moderation/submissions/{dandiset_id}/{submission_filename}/{status}",
+            f"{api_base}/api/moderation/submissions/{dandiset_id}/{resource_uuid}/{status}",
             json=payload,
             headers={'Content-Type': 'application/json'},
             cookies=request.cookies,

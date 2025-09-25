@@ -50,6 +50,16 @@ class ResourceRepository:
         approved_dir.mkdir(parents=True, exist_ok=True)
         return approved_dir
 
+    def _resource_path(self, dandiset_id: str, status: str, resource_uuid: str) -> Path:
+        """
+        Compute the full path to a resource YAML given dandiset, status, and UUID.
+        """
+        if status not in {'pending', 'approved'}:
+            raise ValueError("Invalid status: must be 'pending' or 'approved'")
+        base_dir = self._get_pending_dir(dandiset_id) if status == 'pending' else self._get_approved_dir(dandiset_id)
+        filename = f"{resource_uuid}.yaml"
+        return base_dir / filename
+
     def save_resource(self, dandiset_id: str, external_resource: ExternalResource) -> str:
         """
         Save a new pending resource
@@ -75,30 +85,19 @@ class ResourceRepository:
 
         return resource_uuid
 
-    def approve_submission(self, dandiset_id: str, filename: str, approver: AnnotationContributor) -> bool:
+    def approve_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, approver: AnnotationContributor) -> bool:
         """
-        Move a submission from pending to approved folder and add approval information
-
-        Args:
-            dandiset_id: The dandiset identifier
-            filename: The filename of the submission to approve
-            approver: AnnotationContributor model for the person approving
-
-        Returns:
-            True if successful, False otherwise
+        Move a submission from pending to approved folder and add approval information using UUID.
         """
         try:
-            pending_dir = self._get_pending_dir(dandiset_id)
-            approved_dir = self._get_approved_dir(dandiset_id)
-
-            source_path = pending_dir / filename
-            dest_path = approved_dir / filename
+            source_path = self._resource_path(dandiset_id, 'pending', resource_uuid)
+            dest_path = self._resource_path(dandiset_id, 'approved', resource_uuid)
 
             if not source_path.exists():
-                raise FileNotFoundError(f"Submission file not found: {filename}")
+                raise FileNotFoundError(f"Submission file not found: {resource_uuid}.yaml")
 
             if dest_path.exists():
-                raise FileExistsError(f"File already exists in approved folder: {filename}")
+                raise FileExistsError(f"File already exists in approved folder: {resource_uuid}.yaml")
 
             # Load and validate the existing submission as ExternalResource
             with open(source_path, 'r', encoding='utf-8') as file:
@@ -113,7 +112,7 @@ class ResourceRepository:
             updated_data = resource.model_dump(mode='json', exclude_none=True)
             with open(dest_path, 'w', encoding='utf-8') as file:
                 yaml.dump(updated_data, file, default_flow_style=False,
-                         allow_unicode=True, sort_keys=False, indent=2)
+                          allow_unicode=True, sort_keys=False, indent=2)
 
             # Remove the original file from pending folder
             source_path.unlink()
@@ -123,33 +122,19 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error approving submission: {str(e)}")
          
-    def delete_submission(self, dandiset_id: str, filename: str, status: str, moderator: AnnotationContributor) -> bool:
+    def delete_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str, moderator: AnnotationContributor) -> bool:
         """
-        Delete a resource and move it to backup folder with audit trail
-
-        Args:
-            dandiset_id: The dandiset identifier
-            filename: The resource filename to delete
-            status: 'pending' or 'approved'
-            moderator: AnnotationContributor model for the moderator performing deletion
-
-        Returns:
-            True if successful, False otherwise
+        Delete a resource (pending or approved) by UUID and move it to backup folder with audit trail.
         """
         try:
-            # Get source directory based on status
-            if status == 'pending':
-                source_dir = self._get_pending_dir(dandiset_id)
-            elif status == 'approved':
-                source_dir = self._get_approved_dir(dandiset_id)
-            else:
+            if status not in {'pending', 'approved'}:
                 raise ValueError(f"Invalid status: {status}. Must be 'pending' or 'approved'")
 
             # Get source file path
-            source_path = source_dir / filename
+            source_path = self._resource_path(dandiset_id, status, resource_uuid)
 
             if not source_path.exists():
-                raise FileNotFoundError(f"Submission file not found: {filename}")
+                raise FileNotFoundError(f"Submission file not found: {resource_uuid}.yaml")
 
             # Create deleted directory structure
             dandiset_dir = self._get_dandiset_dir(dandiset_id)
@@ -158,7 +143,7 @@ class ResourceRepository:
 
             # Generate timestamped filename for backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"deleted_{timestamp}_{filename}"
+            backup_filename = f"deleted_{timestamp}_{resource_uuid}.yaml"
             backup_path = deleted_dir / backup_filename
 
             # Load and validate the existing submission as ExternalResource
@@ -170,7 +155,7 @@ class ResourceRepository:
             deletion_info = {
                 'deleted_by': moderator.model_dump(mode='json', exclude_none=True),
                 'deletion_date': datetime.now().astimezone().isoformat(),
-                'original_filename': filename,
+                'original_filename': f"{resource_uuid}.yaml",
                 'original_status': status
             }
 
@@ -179,7 +164,7 @@ class ResourceRepository:
             backup_payload['deletion_info'] = deletion_info
             with open(backup_path, 'w', encoding='utf-8') as file:
                 yaml.dump(backup_payload, file, default_flow_style=False,
-                         allow_unicode=True, sort_keys=False, indent=2)
+                          allow_unicode=True, sort_keys=False, indent=2)
 
             # Remove the original file
             source_path.unlink()
@@ -213,7 +198,6 @@ class ResourceRepository:
 
                     # Add dandiset info to each resource
                     for res in resources:
-                        res['_dandiset_id'] = dandiset_id
                         all_resources.append(res)
 
             # Sort by annotation_date (newest first)
@@ -247,7 +231,6 @@ class ResourceRepository:
                         loaded = yaml.safe_load(file) or {}
                     resource = ExternalResource.model_validate(loaded)
                     item = resource.model_dump(mode='json', exclude_none=True)
-                    item['_submission_filename'] = yaml_file.name
                     resources.append(item)
                 except ValidationError as e:
                     print(f"Validation error in {yaml_file}: {e}")
@@ -265,40 +248,24 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error loading {status} resources: {str(e)}")
 
-    def get_resource_by_filename(self, dandiset_id: str, filename: str, status: str = 'pending') -> Optional[Dict[str, Any]]:
+    def get_resource_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str = 'pending') -> Optional[Dict[str, Any]]:
         """
-        Get a specific resource by filename
-
-        Args:
-            dandiset_id: The dandiset identifier
-            filename: The resource filename
-            status: 'pending' or 'approved'
-
-        Returns:
-            The resource data or None if not found
+        Get a specific resource by UUID.
         """
         try:
-            if status == 'pending':
-                target_dir = self._get_pending_dir(dandiset_id)
-            else:
-                target_dir = self._get_approved_dir(dandiset_id)
-
-            filepath = target_dir / filename
+            filepath = self._resource_path(dandiset_id, status, resource_uuid)
 
             if not filepath.exists():
                 return None
 
             with open(filepath, 'r', encoding='utf-8') as file:
-                data = yaml.safe_load(file)
-                if data:
-                    data['_submission_filename'] = filename
-                    data['_submission_status'] = status
-                    data['status'] = status
-                    data['_dandiset_id'] = dandiset_id
-                return data
+                loaded = yaml.safe_load(file) or {}
+            resource = ExternalResource.model_validate(loaded)
+            data = resource.model_dump(mode='json', exclude_none=True)
+            return data
 
         except Exception as e:
-            print(f"Error loading resource {filename}: {e}")
+            print(f"Error loading resource {resource_uuid}: {e}")
             return None
 
     def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
@@ -328,7 +295,6 @@ class ResourceRepository:
                     for res in dandiset_resources:
                         contributor_email = res.get('annotation_contributor', {}).get('email', '')
                         if contributor_email == user_email:
-                            res['_dandiset_id'] = dandiset_id
                             collected.append(res)
 
             # Sort by annotation_date (newest first)

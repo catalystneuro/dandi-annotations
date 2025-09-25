@@ -140,6 +140,15 @@ class ResourceService:
         if status not in {"pending", "approved"}:
             raise ValueError("Status parameter must be 'pending' or 'approved'")
 
+    def _validate_uuid(self, resource_uuid: str) -> None:
+        """
+        Validate UUID format.
+        """
+        try:
+            uuid.UUID(str(resource_uuid))
+        except Exception:
+            raise ValueError("Invalid UUID format")
+
     # ---------------------------
     # Serialization helper (service-layer serialization)
     # ---------------------------
@@ -329,13 +338,14 @@ class ResourceService:
         return self.repo.get_all_resources(status)
 
 
-    def get_submission_by_filename(self, dandiset_id: str, filename: str, status: str) -> Optional[Dict[str, Any]]:
+    def get_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str) -> Optional[Dict[str, Any]]:
         """
-        Validate input and return a resource by filename and status (serialized).
+        Validate input and return a resource by UUID and status (serialized).
         """
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        submission = self.repo.get_resource_by_filename(dandiset_id, filename, status)
+        self._validate_uuid(resource_uuid)
+        submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
         return self._serialize_resource(submission)
 
     @paginate
@@ -415,9 +425,9 @@ class ResourceService:
             'resource': resource_data,
         }
     
-    def approve_submission(self, dandiset_id: str, filename: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def approve_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate moderator payload, approve the pending submission, and return the approved record (serialized).
+        Validate moderator payload, approve the pending submission by UUID, and return the approved record (serialized).
 
         Expected data keys:
           - moderator_name (required)
@@ -425,8 +435,9 @@ class ResourceService:
           - moderator_identifier (optional)
           - moderator_url (optional)
         """
-        # Validate dandiset_id
+        # Validate dandiset_id and UUID
         self._validate_dandiset_id(dandiset_id)
+        self._validate_uuid(resource_uuid)
 
         # Extract moderator fields and validate via Pydantic model
         name = (data or {}).get('moderator_name', '').strip()
@@ -449,26 +460,26 @@ class ResourceService:
             raise ValueError(f"Validation error: {str(e)}")
 
         # Ensure the pending submission exists before attempting approval
-        pending = self.repo.get_resource_by_filename(dandiset_id, filename, "pending")
+        pending = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, "pending")
         if not pending:
             # Let the route decide 404 vs 500 by raising FileNotFoundError
             raise FileNotFoundError("Submission not found")
 
         # Approve via repository
-        success = self.repo.approve_submission(dandiset_id, filename, approver)
+        success = self.repo.approve_submission_by_uuid(dandiset_id, resource_uuid, approver)
         if not success:
             raise Exception("Approval failed")
 
-        approved = self.repo.get_resource_by_filename(dandiset_id, filename, "approved")
+        approved = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, "approved")
         return self._serialize_resource(approved)
 
-    def delete_submission(self, dandiset_id: str, filename: str, status: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def delete_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Delete a resource (pending or approved) and return a deletion summary.
+        Delete a resource (pending or approved) by UUID and return a deletion summary.
 
         Args:
             dandiset_id: Dandiset identifier (may be 'dandiset_XXXXXX' or 'XXXXXX')
-            filename: Submission filename to delete
+            resource_uuid: Resource UUID to delete
             status: 'pending' or 'approved'
             data: JSON payload containing moderator info:
                   - moderator_name (required)
@@ -478,11 +489,12 @@ class ResourceService:
 
         Returns:
             Dict with deletion summary fields:
-              - dandiset_id, filename, status, resource_name, deleted_by, deletion_date (ISO)
+              - dandiset_id, resource_uuid, status, resource_name, deleted_by, deletion_date (ISO)
         """
         # Basic input checks
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
+        self._validate_uuid(resource_uuid)
 
         name = (data or {}).get('moderator_name', '').strip()
         email = (data or {}).get('moderator_email', '').strip()
@@ -504,21 +516,21 @@ class ResourceService:
             raise ValueError(f"Validation error: {str(e)}")
 
         # Load submission pre-delete to capture resource_name
-        submission = self.repo.get_resource_by_filename(dandiset_id, filename, status)
+        submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
         if not submission:
             raise FileNotFoundError("Submission not found")
 
-        resource_name = submission.get('name', filename)
+        resource_name = submission.get('name', resource_uuid)
 
         # Delegate deletion to repository (moves to backup and deletes original)
-        success = self.repo.delete_submission(dandiset_id, filename, status, moderator)
+        success = self.repo.delete_submission_by_uuid(dandiset_id, resource_uuid, status, moderator)
         if not success:
             raise Exception("Deletion failed")
 
         deletion_date = datetime.now().astimezone().isoformat()
         return {
             'dandiset_id': dandiset_id,
-            'filename': filename,
+            'resource_uuid': resource_uuid,
             'status': status,
             'resource_name': resource_name,
             'deleted_by': name,

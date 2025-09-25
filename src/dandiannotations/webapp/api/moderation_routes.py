@@ -55,8 +55,7 @@ def get_submission_by_status(dandiset_id, resource_uuid, status):
         return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     try:
-        submission_filename = f"{resource_uuid}.yaml"
-        submission = resource_service.get_submission_by_filename(dandiset_id, submission_filename, status)
+        submission = resource_service.get_submission_by_uuid(dandiset_id, resource_uuid, status)
         if not submission:
             return not_found_response("Submission")
         return success_response(data=submission, message="Submission retrieved successfully")
@@ -130,8 +129,7 @@ def delete_submission(dandiset_id, resource_uuid, status):
 
     data = request.get_json() or {}
     try:
-        submission_filename = f"{resource_uuid}.yaml"
-        result = resource_service.delete_submission(dandiset_id, submission_filename, status, data)
+        result = resource_service.delete_submission_by_uuid(dandiset_id, resource_uuid, status, data)
         name = result.get("resource_name", resource_uuid)
         return success_response(data=result, message=f"Submission '{name}' deleted successfully")
     except ValueError as e:
@@ -165,8 +163,7 @@ def approve_submission(dandiset_id, resource_uuid):
 
     data = request.get_json() or {}
     try:
-        submission_filename = f"{resource_uuid}.yaml"
-        approved = resource_service.approve_submission(dandiset_id, submission_filename, data)
+        approved = resource_service.approve_submission_by_uuid(dandiset_id, resource_uuid, data)
         return success_response(data=approved, message="Submission approved successfully")
     except ValueError as e:
         return validation_error_response(str(e))
