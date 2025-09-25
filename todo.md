@@ -21,7 +21,7 @@
 - Service tests for business logic and error handling
 - App tests for end-to-end API functionality
 
-7) Remove excessive try-except blocks
+7) Remove excessive try-except blocks and excessive .get(x, None) usage
 
 8) Update docstrings to numpy style
 
