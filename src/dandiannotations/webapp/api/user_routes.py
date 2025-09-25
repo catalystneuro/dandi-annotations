@@ -29,7 +29,7 @@ auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
 
 @user_api_bp.route("/user/<user_email>/<status>", methods=["GET"])
 @handle_api_errors("Failed to retrieve user submissions")
-def get_user_submissions_by_status(user_email, status):
+def get_resources_by_user(user_email, status):
     """
     GET /api/resources/user/{user_email}/{status}
     Return the current user's submissions by status (authentication required).

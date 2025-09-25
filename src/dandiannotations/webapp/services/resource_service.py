@@ -349,7 +349,7 @@ class ResourceService:
         return [self._serialize_resource(m) for m in models]
 
 
-    def get_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str) -> Optional[Dict[str, Any]]:
+    def get_resource_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str) -> Optional[Dict[str, Any]]:
         """
         Validate input and return a resource by UUID and status (serialized).
         """

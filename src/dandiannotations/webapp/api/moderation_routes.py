@@ -37,7 +37,7 @@ auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
 
 @moderation_api_bp.route("/submissions/<dandiset_id>/<resource_uuid>/<status>", methods=["GET"])
 @handle_api_errors("Failed to retrieve resource")
-def get_submission_by_status(dandiset_id, resource_uuid, status):
+def get_resource_by_uuid(dandiset_id, resource_uuid, status):
     """
     GET /api/moderation/submissions/{dandiset_id}/{resource_uuid}/{status}
     Thin route: auth check + delegate to service for validation and serialization.
@@ -55,7 +55,7 @@ def get_submission_by_status(dandiset_id, resource_uuid, status):
         return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
     try:
-        submission = resource_service.get_submission_by_uuid(dandiset_id, resource_uuid, status)
+        submission = resource_service.get_resource_by_uuid(dandiset_id, resource_uuid, status)
         if not submission:
             return not_found_response("Submission")
         return success_response(data=submission, message="Submission retrieved successfully")
@@ -67,7 +67,7 @@ def get_submission_by_status(dandiset_id, resource_uuid, status):
 
 @moderation_api_bp.route("/submissions/<status>", methods=["GET"])
 @handle_api_errors("Failed to retrieve resources")
-def get_submissions_by_status(status):
+def get_all_resources(status):
     """
     GET /api/moderation/submissions/{status}
     Get all resources across all dandisets by status (moderator only)

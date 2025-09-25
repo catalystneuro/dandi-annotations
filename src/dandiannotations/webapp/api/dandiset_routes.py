@@ -30,7 +30,7 @@ auth_manager = AuthManager(MODERATORS_CONFIG_PATH)
 
 @dandiset_api_bp.route("/<dandiset_id>/<status>", methods=["GET"])
 @handle_api_errors("Failed to retrieve resources")
-def get_resources_by_status(dandiset_id, status):
+def get_resources_by_dandiset(dandiset_id, status):
     """
     Return paginated resources for a dandiset and status.
 
