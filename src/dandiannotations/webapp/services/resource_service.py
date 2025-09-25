@@ -313,7 +313,7 @@ class ResourceService:
         }
 
     # ---------------------------
-    # Get resource by dandiset, user, filename, or all
+    # Get resource by dandiset, user, uuid, or all
     # ---------------------------
     @paginate
     def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
@@ -466,7 +466,7 @@ class ResourceService:
             raise FileNotFoundError("Submission not found")
 
         # Approve via repository
-        success = self.repo.approve_submission_by_uuid(dandiset_id, resource_uuid, approver)
+        success = self.repo.approve_submission(dandiset_id, resource_uuid, approver)
         if not success:
             raise Exception("Approval failed")
 
@@ -523,7 +523,7 @@ class ResourceService:
         resource_name = submission.get('name', resource_uuid)
 
         # Delegate deletion to repository (moves to backup and deletes original)
-        success = self.repo.delete_submission_by_uuid(dandiset_id, resource_uuid, status, moderator)
+        success = self.repo.delete_submission(dandiset_id, resource_uuid, status, moderator)
         if not success:
             raise Exception("Deletion failed")
 

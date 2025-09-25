@@ -85,7 +85,7 @@ class ResourceRepository:
 
         return resource_uuid
 
-    def approve_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, approver: AnnotationContributor) -> bool:
+    def approve_submission(self, dandiset_id: str, resource_uuid: str, approver: AnnotationContributor) -> bool:
         """
         Move a submission from pending to approved folder and add approval information using UUID.
         """
@@ -122,7 +122,7 @@ class ResourceRepository:
         except Exception as e:
             raise Exception(f"Error approving submission: {str(e)}")
          
-    def delete_submission_by_uuid(self, dandiset_id: str, resource_uuid: str, status: str, moderator: AnnotationContributor) -> bool:
+    def delete_submission(self, dandiset_id: str, resource_uuid: str, status: str, moderator: AnnotationContributor) -> bool:
         """
         Delete a resource (pending or approved) by UUID and move it to backup folder with audit trail.
         """

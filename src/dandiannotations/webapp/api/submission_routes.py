@@ -33,7 +33,7 @@ def submit_resource():
     - resource_identifier (optional)
     
     Returns:
-        201 Created with submission data and filename
+        201 Created with submission data and location
     """
     # Validate content type
     if not request.is_json:
