@@ -174,7 +174,7 @@ class ResourceService:
     # Get high-level stats and listings
     # ---------------------------
     @paginate
-    def get_all_dandisets(self) -> List[Dict[str, Any]]:
+    def get_all_dandisets(self) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], Dict[str, Any]]]:
         """
         Return all dandisets that have resources (pending or approved).
 
@@ -313,7 +313,7 @@ class ResourceService:
     # ---------------------------
     @paginate
     @serialize_resources
-    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> List[Dict[str, Any]]:
+    def get_resources_by_dandiset(self, dandiset_id: str, status: str) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], Dict[str, Any]]]:
         """
         Return resources for a dandiset by status ('pending' or 'approved').
 
@@ -326,7 +326,7 @@ class ResourceService:
 
     @paginate
     @serialize_resources
-    def get_all_resources(self, status: str) -> List[Dict[str, Any]]:
+    def get_all_resources(self, status: str) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], Dict[str, Any]]]:
         """
         Return all resources across all dandisets for a given status.
 
@@ -349,7 +349,7 @@ class ResourceService:
 
     @paginate
     @serialize_resources
-    def get_resources_by_user(self, user_email: str, status: str) -> List[Dict[str, Any]]:
+    def get_resources_by_user(self, user_email: str, status: str) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], Dict[str, Any]]]:
         """
         Return resources for a user by status.
 
