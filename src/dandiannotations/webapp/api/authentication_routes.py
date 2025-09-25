@@ -16,7 +16,6 @@ from .validators import (
     validate_content_type,
     validate_json_request,
 )
-from .serializers import serialize_user_info
 from dandiannotations.webapp.utils.auth import AuthManager
 
 auth_api_bp = Blueprint("auth_api", __name__, url_prefix="/auth")
@@ -24,6 +23,30 @@ auth_api_bp = Blueprint("auth_api", __name__, url_prefix="/auth")
 # Align config path with app.py (config/moderators.yaml)
 MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "moderators.yaml")
 auth_manager = AuthManager(config_path=MODERATORS_CONFIG_PATH)
+
+from typing import Any, Dict
+def serialize_user_info(user_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Serialize user information for API response (excluding sensitive data)
+    
+    Args:
+        user_data: User data dictionary
+    
+    Returns:
+        Serialized user data (without password)
+    """
+    if not user_data:
+        return None
+    
+    # Create a copy and remove sensitive fields
+    serialized = user_data.copy()
+    
+    # Remove password and other sensitive fields
+    sensitive_fields = ['password', 'password_hash', 'salt']
+    for field in sensitive_fields:
+        serialized.pop(field, None)
+    
+    return serialized
 
 
 @auth_api_bp.route("/login", methods=["POST"])
