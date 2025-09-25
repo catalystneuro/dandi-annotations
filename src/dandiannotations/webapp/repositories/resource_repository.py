@@ -50,7 +50,7 @@ class ResourceRepository:
         approved_dir.mkdir(parents=True, exist_ok=True)
         return approved_dir
 
-    def _resource_path(self, dandiset_id: str, status: str, resource_uuid: str) -> Path:
+    def _get_resource_path(self, dandiset_id: str, status: str, resource_uuid: str) -> Path:
         """
         Compute the full path to a resource YAML given dandiset, status, and UUID.
         """
@@ -90,8 +90,8 @@ class ResourceRepository:
         Move a submission from pending to approved folder and add approval information using UUID.
         """
         try:
-            source_path = self._resource_path(dandiset_id, 'pending', resource_uuid)
-            dest_path = self._resource_path(dandiset_id, 'approved', resource_uuid)
+            source_path = self._get_resource_path(dandiset_id, 'pending', resource_uuid)
+            dest_path = self._get_resource_path(dandiset_id, 'approved', resource_uuid)
 
             if not source_path.exists():
                 raise FileNotFoundError(f"Submission file not found: {resource_uuid}.yaml")
@@ -131,7 +131,7 @@ class ResourceRepository:
                 raise ValueError(f"Invalid status: {status}. Must be 'pending' or 'approved'")
 
             # Get source file path
-            source_path = self._resource_path(dandiset_id, status, resource_uuid)
+            source_path = self._get_resource_path(dandiset_id, status, resource_uuid)
 
             if not source_path.exists():
                 raise FileNotFoundError(f"Submission file not found: {resource_uuid}.yaml")
@@ -253,7 +253,7 @@ class ResourceRepository:
         Get a specific resource by UUID.
         """
         try:
-            filepath = self._resource_path(dandiset_id, status, resource_uuid)
+            filepath = self._get_resource_path(dandiset_id, status, resource_uuid)
 
             if not filepath.exists():
                 return None
