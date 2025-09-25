@@ -5,14 +5,10 @@
 - Remove duplicate regex checks from services/routes; routes keep only HTTP envelope checks (auth, content-type, JSON presence)
 - Services construct models and propagate validation errors upstream
 
-2) Move serialization into Pydantic models
-- Services return model_dump outputs from Pydantic models
-- Minimize custom serializers; keep only envelopes/pagination formatting if needed
-
 4) Remove Redundant Code
 - Legacy Endpoints in routes.py
 - Unused methods in resource_repository.py
-- duplicate validation and serialization logic
+- duplicate validation
 
 5) Add Tests
 - Unit tests for Pydantic models (validation and serialization)
@@ -26,3 +22,5 @@
 8) Update docstrings to numpy style
 
 9) Update functions/methods to keyword-only
+
+10) ResourceService.get_all_dandisets breaks its contract by digging into the internals of file system storage, rather than relying on external methods from `ResourceRepository`.
