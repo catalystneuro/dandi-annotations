@@ -22,5 +22,3 @@
 8) Update docstrings to numpy style
 
 9) Update functions/methods to keyword-only
-
-10) ResourceService.get_all_dandisets breaks its contract by digging into the internals of file system storage, rather than relying on external methods from `ResourceRepository`.
