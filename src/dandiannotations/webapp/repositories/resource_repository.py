@@ -59,6 +59,17 @@ class ResourceRepository:
         base_dir = self._get_pending_dir(dandiset_id) if status == 'pending' else self._get_approved_dir(dandiset_id)
         filename = f"{resource_uuid}.yaml"
         return base_dir / filename
+    
+    def get_all_dandiset_ids(self) -> List[str]:
+        """
+        Return a list of dandiset directory names (e.g., 'dandiset_000001') present under base_dir.
+        """
+        dandiset_ids: List[str] = []
+        for dandiset_dir in self.base_dir.iterdir():
+            if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                dandiset_ids.append(dandiset_dir.name)
+        dandiset_ids.sort()
+        return dandiset_ids
 
     def save_resource(self, dandiset_id: str, external_resource: ExternalResource) -> str:
         """

@@ -191,28 +191,25 @@ class ResourceService:
         """
         dandisets = []
 
-        # Iterate through all dandiset directories under the repository base_dir
-        for dandiset_dir in self.repo.base_dir.iterdir():
-            if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
-                dandiset_id = dandiset_dir.name
+        # Iterate through dandiset IDs provided by repository
+        for dandiset_id in self.repo.get_all_dandiset_ids():
+            # Count resources via repository methods
+            pending_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'pending'))
+            approved_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'approved'))
+            total_count = pending_count + approved_count
 
-                # Count resources via repository methods
-                pending_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'pending'))
-                approved_count = len(self.repo.get_resources_by_dandiset(dandiset_id, 'approved'))
-                total_count = pending_count + approved_count
+            # Only include dandisets that have resources
+            if total_count > 0:
+                # Format display name as DANDI:XXXXXX
+                display_id = f"DANDI:{dandiset_id.split('_')[1]}"
 
-                # Only include dandisets that have resources
-                if total_count > 0:
-                    # Format display name as DANDI:XXXXXX
-                    display_id = f"DANDI:{dandiset_id.split('_')[1]}"
-
-                    dandisets.append({
-                        'id': dandiset_id,
-                        'display_id': display_id,
-                        'pending_count': pending_count,
-                        'approved_count': approved_count,
-                        'total_count': total_count
-                    })
+                dandisets.append({
+                    'id': dandiset_id,
+                    'display_id': display_id,
+                    'pending_count': pending_count,
+                    'approved_count': approved_count,
+                    'total_count': total_count
+                })
 
         # Sort by dandiset ID
         dandisets.sort(key=lambda x: x['id'])
