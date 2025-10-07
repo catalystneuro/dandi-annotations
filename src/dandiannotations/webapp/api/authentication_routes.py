@@ -12,10 +12,6 @@ from .responses import (
     created_response,
 )
 from .decorators import handle_api_errors
-from .validators import (
-    validate_content_type,
-    validate_json_request,
-)
 from dandiannotations.webapp.utils.auth import AuthManager
 
 auth_api_bp = Blueprint("auth_api", __name__, url_prefix="/auth")
@@ -57,15 +53,6 @@ def login():
     Authenticate user and create session (auto-login on success).
     Body: { "username": "<email or moderator username>", "password": "<string>" }
     """
-    # Minimal HTTP checks
-    is_valid, error_msg = validate_content_type()
-    if not is_valid:
-        return validation_error_response(error_msg)
-
-    is_valid, error_msg = validate_json_request()
-    if not is_valid:
-        return validation_error_response(error_msg)
-
     data = request.get_json() or {}
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
@@ -114,15 +101,6 @@ def register():
     Register a new user (auto-login on success).
     Body: { "email": "<string>", "password": "<string>", "confirm_password": "<string>" }
     """
-    # Minimal HTTP checks
-    is_valid, error_msg = validate_content_type()
-    if not is_valid:
-        return validation_error_response(error_msg)
-
-    is_valid, error_msg = validate_json_request()
-    if not is_valid:
-        return validation_error_response(error_msg)
-
     data = request.get_json() or {}
     email = (data.get("email") or "").strip()
     password = (data.get("password") or "").strip()

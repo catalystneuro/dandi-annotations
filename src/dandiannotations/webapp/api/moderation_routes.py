@@ -13,10 +13,6 @@ from .responses import (
     forbidden_response,
 )
 from .decorators import handle_api_errors
-from .validators import (
-    validate_content_type,
-    validate_json_request,
-)
 # Validation and serialization are handled in the service layer
 from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
 from dandiannotations.webapp.services.resource_service import ResourceService
@@ -119,14 +115,6 @@ def delete_submission(dandiset_id, resource_uuid, status):
     if status not in {"pending", "approved"}:
         return validation_error_response("Status parameter must be 'pending' or 'approved'")
 
-    # Minimal HTTP checks (content type + JSON presence for moderator info)
-    is_valid, error_msg = validate_content_type()
-    if not is_valid:
-        return validation_error_response(error_msg)
-    is_valid, error_msg = validate_json_request()
-    if not is_valid:
-        return validation_error_response(error_msg)
-
     data = request.get_json() or {}
     try:
         result = resource_service.delete_submission_by_uuid(dandiset_id, resource_uuid, status, data)
@@ -152,14 +140,6 @@ def approve_submission(dandiset_id, resource_uuid):
             return unauthorized_response(auth_error["error"])
         else:
             return forbidden_response(auth_error["error"])
-
-    # Minimal HTTP checks (content type + JSON presence)
-    is_valid, error_msg = validate_content_type()
-    if not is_valid:
-        return validation_error_response(error_msg)
-    is_valid, error_msg = validate_json_request()
-    if not is_valid:
-        return validation_error_response(error_msg)
 
     data = request.get_json() or {}
     try:
