@@ -321,11 +321,6 @@ def moderate():
         pending_submissions = resp_json.get('data', [])
         pagination_info = resp_json.get('pagination', {'page': page, 'per_page': per_page})
 
-        # Ensure template compatibility: add _dandiset_id for each resource if missing
-        for res in pending_submissions:
-            if '_dandiset_id' not in res and 'dandiset_id' in res:
-                res['_dandiset_id'] = res['dandiset_id']
-
         # Fetch overview stats from new API for global counts
         overview_resp = requests.get(
             f"{api_base}/api/home/dandisets/overview",
@@ -386,10 +381,6 @@ def approve_submission(dandiset_id, resource_uuid):
             if resp.status_code == 200:
                 data = resp.json()
                 submission = data.get('data', data)
-
-                # Ensure template compatibility: add _dandiset_id if only dandiset_id provided
-                if submission and '_dandiset_id' not in submission and 'dandiset_id' in submission:
-                    submission['_dandiset_id'] = submission['dandiset_id']
 
                 return render_template(
                     'approve_form.html',
@@ -679,10 +670,10 @@ def my_submissions():
         # Fallback to unique dandiset ids from the submissions
         all_ids = set()
         for sub in community_submissions + approved_submissions:
-            did = sub.get('_dandiset_id') or sub.get('dandiset_id')
+            did = sub.get('dandiset_id')
             if did:
                 all_ids.add(did)
-        all_dandisets = [{'id': did, 'display_id': f"DANDI:{did.split('_')[1]}" if '_' in did else f"DANDI:{str(did).zfill(6)}"} for did in sorted(all_ids)]
+        all_dandisets = [{'id': did, 'display_id': f"DANDI:{did}"} for did in sorted(all_ids)]
 
         return render_template('my_submissions.html',
                                community_submissions=community_submissions,
