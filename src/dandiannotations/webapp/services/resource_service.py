@@ -121,17 +121,6 @@ class ResourceService:
     # ---------------------------
     # Validation helpers (service-layer validation)
     # ---------------------------
-    def _validate_dandiset_id(self, dandiset_id: str) -> None:
-        """
-        Validate dandiset ID format: either 6 digits (000001) or 'dandiset_000001'.
-        Raises ValueError on invalid input.
-        """
-        if not dandiset_id:
-            raise ValueError("Dandiset ID is required")
-        pattern = r'^(dandiset_)?[0-9]{6}$'
-        if not re.match(pattern, dandiset_id):
-            raise ValueError("Invalid dandiset ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)")
-
     def _validate_status(self, status: str) -> None:
         """
         Validate resource status.
@@ -170,8 +159,8 @@ class ResourceService:
 
             # Only include dandisets that have resources
             if total_count > 0:
-                # Format display name as DANDI:XXXXXX
-                display_id = f"DANDI:{dandiset_id.split('_')[1]}"
+                # Format display name as DANDI:XXXXXX (dandiset_id is already 6 digits)
+                display_id = f"DANDI:{dandiset_id}"
 
                 dandisets.append({
                     'id': dandiset_id,
@@ -240,8 +229,8 @@ class ResourceService:
         approved_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'approved')
         pending_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'pending')
 
-        # Build display ID
-        display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+        # Build display ID (dandiset_id is already 6 digits)
+        display_id = f"DANDI:{dandiset_id}"
 
         # Aggregate counts
         approved_count = len(approved_submissions)
@@ -286,7 +275,6 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
-        self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
         return self.repo.get_resources_by_dandiset(dandiset_id, status)
 
@@ -308,7 +296,6 @@ class ResourceService:
         """
         Validate input and return a resource by UUID and status (serialized).
         """
-        self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
         submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
         return submission
@@ -402,9 +389,6 @@ class ResourceService:
           - moderator_identifier (optional)
           - moderator_url (optional)
         """
-        # Validate dandiset_id
-        self._validate_dandiset_id(dandiset_id)
-
         # Extract moderator fields and validate via Pydantic model
         name = (data or {}).get('moderator_name', '').strip()
         email = (data or {}).get('moderator_email', '').strip()
@@ -441,7 +425,7 @@ class ResourceService:
         Delete a resource (pending or approved) by UUID and return a deletion summary.
 
         Args:
-            dandiset_id: Dandiset identifier (may be 'dandiset_XXXXXX' or 'XXXXXX')
+            dandiset_id: Dandiset identifier (6-digit format, e.g., '000001')
             resource_uuid: Resource UUID to delete
             status: 'pending' or 'approved'
             data: JSON payload containing moderator info:
@@ -455,7 +439,6 @@ class ResourceService:
               - dandiset_id, resource_uuid, status, resource_name, deleted_by, deletion_date (ISO)
         """
         # Basic input checks
-        self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
 
         name = (data or {}).get('moderator_name', '').strip()

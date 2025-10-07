@@ -76,10 +76,10 @@ def validate_dandiset_id(dandiset_id: str) -> Tuple[bool, Optional[str]]:
     if not dandiset_id:
         return False, "Dandiset ID is required"
     
-    # Accept either 6-digit format (000001) or full format (dandiset_000001)
-    pattern = r'^(dandiset_)?[0-9]{6}$'
+    # Accept only 6-digit format (000001)
+    pattern = r'^[0-9]{6}$'
     if not re.match(pattern, dandiset_id):
-        return False, "Invalid dandiset ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)"
+        return False, "Enter 6-digit DANDI set ID (e.g., 000001)"
     
     return True, None
 

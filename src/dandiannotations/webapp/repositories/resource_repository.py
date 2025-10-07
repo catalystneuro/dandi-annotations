@@ -26,14 +26,8 @@ class ResourceRepository:
 
     def _get_dandiset_dir(self, dandiset_id: str) -> Path:
         """Get the directory path for a specific dandiset"""
-        # Normalize dandiset_id (remove 'dandiset_' prefix if present)
-        if dandiset_id.startswith('dandiset_'):
-            dandiset_id = dandiset_id[9:]
-
-        # Ensure it's formatted as dandiset_XXXXXX
-        if not dandiset_id.startswith('dandiset_'):
-            dandiset_id = f"dandiset_{dandiset_id.zfill(6)}"
-
+        # Ensure 6-digit format with zero padding
+        dandiset_id = dandiset_id.zfill(6)
         return self.base_dir / dandiset_id
 
     def _get_pending_dir(self, dandiset_id: str) -> Path:
@@ -62,11 +56,11 @@ class ResourceRepository:
     
     def get_all_dandiset_ids(self) -> List[str]:
         """
-        Return a list of dandiset directory names (e.g., 'dandiset_000001') present under base_dir.
+        Return a list of 6-digit dandiset IDs (e.g., '000001') present under base_dir.
         """
         dandiset_ids: List[str] = []
         for dandiset_dir in self.base_dir.iterdir():
-            if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+            if dandiset_dir.is_dir() and dandiset_dir.name.isdigit() and len(dandiset_dir.name) == 6:
                 dandiset_ids.append(dandiset_dir.name)
         dandiset_ids.sort()
         return dandiset_ids
@@ -201,9 +195,9 @@ class ResourceRepository:
 
             all_resources: List[ExternalResource] = []
 
-            # Iterate through all dandiset directories
+            # Iterate through all dandiset directories (6-digit IDs)
             for dandiset_dir in self.base_dir.iterdir():
-                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                if dandiset_dir.is_dir() and dandiset_dir.name.isdigit() and len(dandiset_dir.name) == 6:
                     dandiset_id = dandiset_dir.name
                     resources = self.get_resources_by_dandiset(dandiset_id, status)
 
@@ -302,9 +296,9 @@ class ResourceRepository:
 
             collected: List[ExternalResource] = []
 
-            # Iterate through all dandiset directories
+            # Iterate through all dandiset directories (6-digit IDs)
             for dandiset_dir in self.base_dir.iterdir():
-                if dandiset_dir.is_dir() and dandiset_dir.name.startswith('dandiset_'):
+                if dandiset_dir.is_dir() and dandiset_dir.name.isdigit() and len(dandiset_dir.name) == 6:
                     dandiset_id = dandiset_dir.name
 
                     # Get resources for this dandiset by status
