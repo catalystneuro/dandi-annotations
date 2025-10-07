@@ -8,6 +8,7 @@ from flask_session import Session
 from datetime import datetime, timedelta
 import re
 import requests
+from pydantic_core import PydanticCustomError
 
 # Add the parent directory to the path to import our models
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -83,31 +84,6 @@ def inject_auth_status():
         'is_moderator': auth_manager.is_moderator(),
         'user_type': auth_manager.get_user_type()
     }
-
-def validate_email(email):
-    """Basic email validation"""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
-
-def validate_url(url):
-    """Basic URL validation"""
-    pattern = r'^https?://[^\s/$.?#].[^\s]*$'
-    return re.match(pattern, url) is not None
-
-def validate_orcid(orcid):
-    """Validate ORCID format"""
-    if not orcid:
-        return True  # ORCID is optional
-    pattern = r'^https://orcid\.org/\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
-    return re.match(pattern, orcid) is not None
-
-def validate_dandiset_id(dandiset_id):
-    """Validate DANDI set ID format"""
-    if not dandiset_id:
-        return False
-    # Accept either 6-digit format (000001) or full format (dandiset_000001)
-    pattern = r'^(dandiset_)?[0-9]{6}$'
-    return re.match(pattern, dandiset_id) is not None
 
 @app.route('/')
 def index():
@@ -571,9 +547,12 @@ def register():
             return render_template('register.html')
         
         # Validate email format
-        if not validate_email(email):
+        try:
+            AnnotationContributor.validate_email(email)
+        except PydanticCustomError:
             flash('Invalid email format', 'error')
             return render_template('register.html')
+
         
         # Check password confirmation
         if password != confirm_password:

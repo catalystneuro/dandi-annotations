@@ -1,15 +1,5 @@
 # TODO
 
-1) Move validation into Pydantic models
-- Rely on ExternalResource and AnnotationContributor for field and cross-field validation
-- Remove duplicate regex checks from services/routes; routes keep only HTTP envelope checks (auth, content-type, JSON presence)
-- Services construct models and propagate validation errors upstream
-
-4) Remove Redundant Code
-- Legacy Endpoints in routes.py
-- Unused methods in resource_repository.py
-- duplicate validation
-
 5) Add Tests
 - Unit tests for Pydantic models (validation and serialization)
 - Integration tests for services and routes
@@ -22,5 +12,3 @@
 8) Update docstrings to numpy style
 
 9) Update functions/methods to keyword-only
-
-10) Enforce dandiset_id = "XXXXXX" instead of "dandiset_XXXXXX"

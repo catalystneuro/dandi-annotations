@@ -57,6 +57,12 @@ class AnnotationContributor(DandiBaseModel):
         
         return v
 
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email format using pydantic EmailStr"""
+        EmailStr._validate(v)
+        return v
+
 class ExternalResource(Resource):
     uuid: UUID = Field(
         title="UUID",
