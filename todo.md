@@ -22,3 +22,5 @@
 8) Update docstrings to numpy style
 
 9) Update functions/methods to keyword-only
+
+10) Enforce dandiset_id = "XXXXXX" instead of "dandiset_XXXXXX"

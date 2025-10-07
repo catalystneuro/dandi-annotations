@@ -132,42 +132,12 @@ class ResourceService:
         if not re.match(pattern, dandiset_id):
             raise ValueError("Invalid dandiset ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)")
 
-    def _validate_email(self, email: Optional[str]) -> None:
-        if not email:
-            raise ValueError("Moderator email is required")
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(pattern, email):
-            raise ValueError("Invalid moderator email format")
-
-    def _validate_url(self, url: Optional[str]) -> None:
-        if not url:
-            return
-        pattern = r'^https?://[^\s/$.?#].[^\s]*$'
-        if not re.match(pattern, url):
-            raise ValueError("Invalid moderator URL format. Must start with http:// or https://")
-
-    def _validate_orcid(self, orcid: Optional[str]) -> None:
-        if not orcid:
-            return
-        pattern = r'^https://orcid\.org/\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
-        if not re.match(pattern, orcid):
-            raise ValueError("Invalid moderator ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000")
-
     def _validate_status(self, status: str) -> None:
         """
         Validate resource status.
         """
         if status not in {"pending", "approved"}:
             raise ValueError("Status parameter must be 'pending' or 'approved'")
-
-    def _validate_uuid(self, resource_uuid: str) -> None:
-        """
-        Validate UUID format.
-        """
-        try:
-            uuid.UUID(str(resource_uuid))
-        except Exception:
-            raise ValueError("Invalid UUID format")
 
 
     # ---------------------------
@@ -340,7 +310,6 @@ class ResourceService:
         """
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        self._validate_uuid(resource_uuid)
         submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
         return submission
 
@@ -433,9 +402,8 @@ class ResourceService:
           - moderator_identifier (optional)
           - moderator_url (optional)
         """
-        # Validate dandiset_id and UUID
+        # Validate dandiset_id
         self._validate_dandiset_id(dandiset_id)
-        self._validate_uuid(resource_uuid)
 
         # Extract moderator fields and validate via Pydantic model
         name = (data or {}).get('moderator_name', '').strip()
@@ -489,7 +457,6 @@ class ResourceService:
         # Basic input checks
         self._validate_dandiset_id(dandiset_id)
         self._validate_status(status)
-        self._validate_uuid(resource_uuid)
 
         name = (data or {}).get('moderator_name', '').strip()
         email = (data or {}).get('moderator_email', '').strip()
