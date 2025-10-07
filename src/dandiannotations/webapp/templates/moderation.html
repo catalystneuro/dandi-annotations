@@ -102,7 +102,7 @@
                                             <i class="fas fa-check"></i> Approve Submission
                                         </a>
                                         <button type="button" class="btn btn-danger w-100" 
-                                                onclick="confirmDelete('dandiset_{{ resource.dandiset_id }}', '{{ resource.uuid }}', 'community')">
+                                                onclick="confirmDelete('dandiset_{{ resource.dandiset_id }}', '{{ resource.uuid }}', 'pending')">
                                             <i class="fas fa-trash"></i> Delete Submission
                                         </button>
                                         <a href="{{ url_for('dandiset_resources', dandiset_id='dandiset_' ~ resource.dandiset_id) }}" 
