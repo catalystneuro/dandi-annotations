@@ -225,7 +225,7 @@ class ResourceService:
         Return detailed statistics for a specific dandiset.
         Computed from approved + pending lists to avoid brittle existence checks.
         """
-        # Fetch lists using repository helpers (these tolerate missing dirs)
+        ExternalResource.validate_dandiset_id(dandiset_id)
         approved_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'approved')
         pending_submissions = self.repo.get_resources_by_dandiset(dandiset_id, 'pending')
 
@@ -275,6 +275,7 @@ class ResourceService:
 
         When called with kwargs page/per_page, returns (items, pagination_info).
         """
+        ExternalResource.validate_dandiset_id(dandiset_id)
         self._validate_status(status)
         return self.repo.get_resources_by_dandiset(dandiset_id, status)
 
@@ -296,6 +297,8 @@ class ResourceService:
         """
         Validate input and return a resource by UUID and status (serialized).
         """
+        ExternalResource.validate_dandiset_id(dandiset_id)
+        ExternalResource.validate_uuid(resource_uuid)
         self._validate_status(status)
         submission = self.repo.get_resource_by_uuid(dandiset_id, resource_uuid, status)
         return submission
@@ -389,7 +392,8 @@ class ResourceService:
           - moderator_identifier (optional)
           - moderator_url (optional)
         """
-        # Extract moderator fields and validate via Pydantic model
+        ExternalResource.validate_dandiset_id(dandiset_id)
+        ExternalResource.validate_uuid(resource_uuid)
         name = (data or {}).get('moderator_name', '').strip()
         email = (data or {}).get('moderator_email', '').strip()
         identifier = (data or {}).get('moderator_identifier', '').strip() if data else None
@@ -438,7 +442,8 @@ class ResourceService:
             Dict with deletion summary fields:
               - dandiset_id, resource_uuid, status, resource_name, deleted_by, deletion_date (ISO)
         """
-        # Basic input checks
+        ExternalResource.validate_dandiset_id(dandiset_id)
+        ExternalResource.validate_uuid(resource_uuid)
         self._validate_status(status)
 
         name = (data or {}).get('moderator_name', '').strip()

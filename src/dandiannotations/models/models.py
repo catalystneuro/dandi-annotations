@@ -99,3 +99,9 @@ class ExternalResource(Resource):
             return v
         else:
             raise ValueError('Enter 6-digit DANDI set ID (e.g., 000001)')
+
+    @classmethod
+    def validate_uuid(cls, v):
+        """Validate UUID format"""
+        UUID(str(v))
+        return v

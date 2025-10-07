@@ -102,7 +102,7 @@
                                 <div class="card-body">
                                     <p class="card-text">
                                         <strong>DANDI Set:</strong> 
-                                        <a href="{{ url_for('dandiset_resources', dandiset_id='dandiset_' ~ resource.dandiset_id) }}" class="text-decoration-none">
+                                        <a href="{{ url_for('dandiset_resources', dandiset_id=resource.dandiset_id) }}" class="text-decoration-none">
                                             DANDI:{{ resource.dandiset_id }}
                                         </a>
                                     </p>
@@ -201,7 +201,7 @@
                                 <div class="card-body">
                                     <p class="card-text">
                                         <strong>DANDI Set:</strong> 
-                                        <a href="{{ url_for('dandiset_resources', dandiset_id='dandiset_' ~ resource.dandiset_id) }}" class="text-decoration-none">
+                                        <a href="{{ url_for('dandiset_resources', dandiset_id=resource.dandiset_id) }}" class="text-decoration-none">
                                             DANDI:{{ resource.dandiset_id }}
                                         </a>
                                     </p>
