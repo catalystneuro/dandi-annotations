@@ -7,12 +7,14 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_session import Session
 from datetime import datetime, timedelta
 import re
+import requests
+from pydantic_core import PydanticCustomError
 
 # Add the parent directory to the path to import our models
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from dandiannotations.webapp.utils.yaml_handler import YAMLHandler
-from dandiannotations.webapp.utils.submission_handler import SubmissionHandler
+from dandiannotations.webapp.repositories.resource_repository import ResourceRepository
+from dandiannotations.webapp.services.resource_service import ResourceService
 from dandiannotations.webapp.utils.schema_utils import get_resource_relation_options, get_resource_type_options
 from dandiannotations.webapp.utils.auth import AuthManager, login_required
 from dandiannotations.models.models import ExternalResource, AnnotationContributor
@@ -66,11 +68,8 @@ def handle_500(error):
 
 # Configuration
 SUBMISSIONS_DIR = os.path.join(os.path.dirname(__file__), '..', 'submissions')
-submission_handler = SubmissionHandler(SUBMISSIONS_DIR)
-
-# Keep old YAML handler for backward compatibility if needed
-YAML_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'external_resources', 'external_resources.yaml')
-yaml_handler = YAMLHandler(YAML_FILE_PATH)
+resource_repository = ResourceRepository(SUBMISSIONS_DIR)
+resource_service = ResourceService(resource_repository)
 
 # Authentication configuration
 MODERATORS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config', 'moderators.yaml')
@@ -86,58 +85,34 @@ def inject_auth_status():
         'user_type': auth_manager.get_user_type()
     }
 
-def validate_email(email):
-    """Basic email validation"""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
-
-def validate_url(url):
-    """Basic URL validation"""
-    pattern = r'^https?://[^\s/$.?#].[^\s]*$'
-    return re.match(pattern, url) is not None
-
-def validate_orcid(orcid):
-    """Validate ORCID format"""
-    if not orcid:
-        return True  # ORCID is optional
-    pattern = r'^https://orcid\.org/\d{4}-\d{4}-\d{4}-\d{3}[\dX]$'
-    return re.match(pattern, orcid) is not None
-
-def validate_dandiset_id(dandiset_id):
-    """Validate DANDI set ID format"""
-    if not dandiset_id:
-        return False
-    # Accept either 6-digit format (000001) or full format (dandiset_000001)
-    pattern = r'^(dandiset_)?[0-9]{6}$'
-    return re.match(pattern, dandiset_id) is not None
-
 @app.route('/')
 def index():
     """Homepage showing all dandisets with submission counts"""
     try:
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
-        per_page = 10  # 10 dandisets per page
-        
-        # Get paginated dandisets with their submission counts
-        paginated_dandisets, pagination_info = submission_handler.get_all_dandisets_paginated(page, per_page)
-        
-        # Get all dandisets for total statistics (not paginated)
-        all_dandisets = submission_handler.get_all_dandisets()
-        
-        # Calculate total statistics based on authentication status
-        total_approved = sum(ds['approved_count'] for ds in all_dandisets)
-        total_dandisets = len(all_dandisets)
-        
-        # For authenticated moderators, show both approved and pending
-        # For public users, only show approved resources
-        if auth_manager.is_authenticated():
-            total_community = sum(ds['community_count'] for ds in all_dandisets)
-            show_community_stats = True
-        else:
-            total_community = 0
-            show_community_stats = False
-        
+        per_page = 10
+
+        # Call the homepage API endpoints
+        api_base = request.host_url.rstrip('/')
+
+        # Get paginated dandisets
+        response = requests.get(f"{api_base}/api/home/dandisets", params={'page': page, 'per_page': per_page}, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        paginated_dandisets = data['data']
+        pagination_info = data["pagination"]
+
+        # Get overview statistics
+        show_community_stats = auth_manager.is_authenticated()
+        response = requests.get(f"{api_base}/api/home/dandisets/overview", timeout=5)
+        response.raise_for_status()
+        stats = response.json()['data']
+
+        total_approved = stats.get('total_approved', 0)
+        total_dandisets = stats.get('total_dandisets', 0)
+        total_community = stats.get('total_pending', 0)
+
         return render_template('homepage.html',
                              all_dandisets=paginated_dandisets,
                              pagination=pagination_info,
@@ -154,6 +129,12 @@ def index():
                              total_approved=0,
                              total_dandisets=0,
                              show_community_stats=False)
+    
+@app.route('/how-it-works')
+def how_it_works():
+    """How it works information page"""
+    return render_template('how_it_works.html')
+
 
 @app.route('/submit')
 def submit_form():
@@ -165,99 +146,53 @@ def submit_form():
                          relation_options=relation_options,
                          type_options=type_options)
 
-@app.route('/how-it-works')
-def how_it_works():
-    """How it works information page"""
-    return render_template('how_it_works.html')
 
 @app.route('/submit', methods=['POST'])
 def submit_resource():
     """Handle form submission"""
     try:
-        # Get form data
+        # Get form data and convert to dictionary
         form_data = request.form.to_dict()
         
-        # Validate required fields (including dandiset_id)
-        required_fields = ['dandiset_id', 'resource_name', 'resource_url', 'repository', 
-                          'relation', 'resource_type', 'contributor_name', 
-                          'contributor_email']
+        # Call the submission API
+        api_base = request.host_url.rstrip('/')
+        response = requests.post(
+            f"{api_base}/api/submission", 
+            json=form_data, 
+            headers={'Content-Type': 'application/json'},
+            timeout=10
+        )
         
-        for field in required_fields:
-            if not form_data.get(field, '').strip():
-                flash(f'Error: {field.replace("_", " ").title()} is required', 'error')
-                return redirect(url_for('index'))
+        if response.status_code == 201:
+            # Success - extract dandiset_id from response
+            result_data = response.json().get('data', {})
+            dandiset_id = result_data.get('dandiset_id', form_data.get('dandiset_id'))
+            flash('Resource successfully submitted for community review!', 'success')
+            return redirect(url_for('success', dandiset_id=dandiset_id))
+        else:
+            # API returned an error - extract error message
+            error_data = response.json()
+            if 'error' in error_data:
+                error_message = error_data['error'].get('message', 'Unknown error occurred')
+                if 'details' in error_data['error']:
+                    details = error_data['error']['details']
+                    if isinstance(details, dict):
+                        # Format validation errors nicely
+                        for field, field_error in details.items():
+                            error_message = f"{field}: {field_error}"
+                            break  # Show only the first error for simplicity
+            else:
+                error_message = f"Submission failed with status {response.status_code}"
+            
+            flash(f'Error: {error_message}', 'error')
+            return redirect(url_for('submit_form'))
         
-        # Validate dandiset_id format
-        if not validate_dandiset_id(form_data['dandiset_id']):
-            flash('Error: Invalid DANDI set ID format. Use 6 digits (e.g., 000001) or full format (e.g., dandiset_000001)', 'error')
-            return redirect(url_for('index'))
-        
-        # Validate email format
-        if not validate_email(form_data['contributor_email']):
-            flash('Error: Invalid email format', 'error')
-            return redirect(url_for('index'))
-        
-        # Validate URLs
-        if not validate_url(form_data['resource_url']):
-            flash('Error: Invalid resource URL format', 'error')
-            return redirect(url_for('index'))
-        
-        if form_data.get('contributor_url') and not validate_url(form_data['contributor_url']):
-            flash('Error: Invalid contributor URL format', 'error')
-            return redirect(url_for('index'))
-        
-        # Validate ORCID if provided
-        if not validate_orcid(form_data.get('contributor_identifier')):
-            flash('Error: Invalid ORCID format. Should be like: https://orcid.org/0000-0000-0000-0000', 'error')
-            return redirect(url_for('index'))
-        
-        # Create annotation contributor
-        contributor_data = {
-            'name': form_data['contributor_name'],
-            'email': form_data['contributor_email'],
-            'schemaKey': 'AnnotationContributor'
-        }
-        
-        if form_data.get('contributor_identifier'):
-            contributor_data['identifier'] = form_data['contributor_identifier']
-        
-        if form_data.get('contributor_url'):
-            contributor_data['url'] = form_data['contributor_url']
-        
-        # Create external resource data (including dandiset_id)
-        resource_data = {
-            'dandiset_id': form_data['dandiset_id'],
-            'annotation_contributor': contributor_data,
-            'annotation_date': datetime.now().astimezone().isoformat(),
-            'name': form_data['resource_name'],
-            'url': form_data['resource_url'],
-            'repository': form_data['repository'],
-            'relation': form_data['relation'],
-            'resourceType': form_data['resource_type'],
-            'schemaKey': 'ExternalResource'
-        }
-        
-        # Add optional resource identifier if provided
-        if form_data.get('resource_identifier'):
-            resource_data['identifier'] = form_data['resource_identifier']
-        
-        # Validate using Pydantic models
-        try:
-            contributor = AnnotationContributor(**contributor_data)
-            resource = ExternalResource(**resource_data)
-        except Exception as e:
-            flash(f'Validation error: {str(e)}', 'error')
-            return redirect(url_for('index'))
-        
-        # Save to community submissions folder using new submission handler
-        filename = submission_handler.save_community_submission(form_data['dandiset_id'], resource_data)
-        
-        flash('Resource successfully submitted for community review!', 'success')
-        return redirect(url_for('success', dandiset_id=form_data['dandiset_id']))
-        
+    except requests.exceptions.RequestException as e:
+        flash(f'Error connecting to submission service: {str(e)}', 'error')
+        return redirect(url_for('submit_form'))
     except Exception as e:
-        flash(f'Error saving resource: {str(e)}', 'error')
-        return redirect(url_for('index'))
+        flash(f'Error submitting resource: {str(e)}', 'error')
+        return redirect(url_for('submit_form'))
 
 @app.route('/success')
 def success():
@@ -273,40 +208,64 @@ def dandiset_resources(dandiset_id):
         approved_page = request.args.get('approved_page', 1, type=int)
         community_page = request.args.get('community_page', 1, type=int)
         per_page = 9  # 9 resources per page for 3x3 grid
-        
+
+        api_base = request.host_url.rstrip('/')
+
+        # Always get overview for counts and context
+        overview_resp = requests.get(f"{api_base}/api/dandiset/{dandiset_id}/overview", timeout=5)
+        overview_resp.raise_for_status()
+        overview_data = overview_resp.json().get('data', {}) if overview_resp.headers.get('Content-Type', '').startswith('application/json') else overview_resp.json()
+
         # Always get approved submissions
-        approved_submissions, approved_pagination = submission_handler.get_approved_submissions_paginated(
-            dandiset_id, approved_page, per_page)
-        
-        # Always get community submission counts, but only get actual data for authenticated moderators
-        if auth_manager.is_authenticated():
-            # Moderators get full community submissions data
-            community_submissions, community_pagination = submission_handler.get_community_submissions_paginated(
-                dandiset_id, community_page, per_page)
+        approved_resp = requests.get(
+            f"{api_base}/api/dandiset/{dandiset_id}/approved",
+            params={'page': approved_page, 'per_page': per_page},
+            timeout=5
+        )
+        approved_resp.raise_for_status()
+        approved_json = approved_resp.json()
+        approved_submissions = approved_json.get('data', [])
+        approved_pagination = approved_json.get('pagination', {'page': approved_page, 'per_page': per_page})
+
+        # For community submissions: only moderators get actual data
+        if auth_manager.is_moderator():
+            community_resp = requests.get(
+                f"{api_base}/api/dandiset/{dandiset_id}/pending",
+                params={'page': community_page, 'per_page': per_page},
+                cookies=request.cookies,  # forward session cookie for auth
+                timeout=5
+            )
+            community_resp.raise_for_status()
+            community_json = community_resp.json()
+            community_submissions = community_json.get('data', [])
+            community_pagination = community_json.get('pagination', {'page': community_page, 'per_page': per_page})
         else:
-            # Public users get counts only, no actual submission data
-            all_community_submissions = submission_handler.get_community_submissions(dandiset_id)
+            # Public or non-moderator users: show counts only, no actual data
+            pending_count = overview_data.get('pending_count', 0)
             community_submissions = []
             community_pagination = {
-                'page': 1, 'per_page': per_page, 'total_items': len(all_community_submissions), 'total_pages': 1,
-                'has_prev': False, 'has_next': False, 'prev_page': None, 'next_page': None,
-                'start_item': 0, 'end_item': 0
+                'page': 1,
+                'per_page': per_page,
+                'total_items': pending_count,
+                'total_pages': 1,
+                'has_prev': False,
+                'has_next': False,
+                'prev_page': None,
+                'next_page': None,
+                'start_item': 0,
+                'end_item': 0
             }
-        
-        # Get all dandisets for navigation
-        all_dandisets = submission_handler.get_all_dandisets()
-        
+
         # Format display ID as DANDI:XXXXXX
         display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-        
+
         return render_template('dandiset_resources.html',
-                             dandiset_id=dandiset_id,
-                             display_id=display_id,
-                             community_submissions=community_submissions,
-                             approved_submissions=approved_submissions,
-                             community_pagination=community_pagination,
-                             approved_pagination=approved_pagination,
-                             all_dandisets=all_dandisets)
+                               dandiset_id=dandiset_id,
+                               display_id=display_id,
+                               community_submissions=community_submissions,
+                               approved_submissions=approved_submissions,
+                               community_pagination=community_pagination,
+                               approved_pagination=approved_pagination)
     except Exception as e:
         flash(f'Error loading resources: {str(e)}', 'error')
         return redirect(url_for('index'))
@@ -323,163 +282,221 @@ def moderate():
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = 9  # 9 submissions per page for 3x3 grid
-        
-        # Get paginated pending community submissions across all dandisets
-        pending_submissions, pagination_info = submission_handler.get_all_pending_submissions_paginated(page, per_page)
-        
-        # Get all pending submissions for calculating total unique counts
-        all_pending_submissions = submission_handler.get_all_pending_submissions()
-        
-        # Calculate total unique counts
-        total_unique_dandisets = len(set(submission.get('_dandiset_id') for submission in all_pending_submissions))
-        total_unique_contributors = len(set(submission.get('annotation_contributor', {}).get('name') for submission in all_pending_submissions if submission.get('annotation_contributor', {}).get('name')))
-        
-        # Get all dandisets for navigation
-        all_dandisets = submission_handler.get_all_dandisets()
-        
+
+        api_base = request.host_url.rstrip('/')
+
+        # Fetch paginated pending submissions for grid (moderator-only)
+        resp = requests.get(
+            f"{api_base}/api/moderation/submissions/pending",
+            params={'page': page, 'per_page': per_page},
+            cookies=request.cookies,
+            timeout=5
+        )
+        resp.raise_for_status()
+        resp_json = resp.json()
+        pending_submissions = resp_json.get('data', [])
+        pagination_info = resp_json.get('pagination', {'page': page, 'per_page': per_page})
+
+        # Fetch overview stats from new API for global counts
+        overview_resp = requests.get(
+            f"{api_base}/api/home/dandisets/overview",
+            cookies=request.cookies,
+            timeout=5
+        )
+        overview_resp.raise_for_status()
+        overview_data = overview_resp.json().get('data', {}) if overview_resp.headers.get('Content-Type', '').startswith('application/json') else overview_resp.json()
+
+        total_unique_dandisets = overview_data.get('total_dandisets', 0)
+        total_unique_contributors = overview_data.get('unique_contributors', 0)
+
         return render_template('moderation.html',
-                             pending_submissions=pending_submissions,
-                             pagination=pagination_info,
-                             all_dandisets=all_dandisets,
-                             total_unique_dandisets=total_unique_dandisets,
-                             total_unique_contributors=total_unique_contributors)
+                               pending_submissions=pending_submissions,
+                               pagination=pagination_info,
+                               total_unique_dandisets=total_unique_dandisets,
+                               total_unique_contributors=total_unique_contributors)
     except Exception as e:
         flash(f'Error loading pending submissions: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/approve/<dandiset_id>/<filename>', methods=['GET', 'POST'])
+@app.route('/approve/<dandiset_id>/<resource_uuid>', methods=['GET', 'POST'])
 @login_required
-def approve_submission(dandiset_id, filename):
-    """Approve a community submission"""
-    if request.method == 'GET':
-        # Show approval form
-        try:
-            submission = submission_handler.get_submission_by_filename(dandiset_id, filename, 'community')
-            if not submission:
-                flash('Submission not found', 'error')
-                return redirect(url_for('moderate'))
-            
-            return render_template('approve_form.html',
-                                 submission=submission,
-                                 dandiset_id=dandiset_id,
-                                 filename=filename)
-        except Exception as e:
-            flash(f'Error loading submission: {str(e)}', 'error')
-            return redirect(url_for('moderate'))
-    
-    elif request.method == 'POST':
-        # Process approval
-        try:
-            # Get moderator information from form
-            moderator_info = {
-                'name': request.form.get('moderator_name', '').strip(),
-                'email': request.form.get('moderator_email', '').strip(),
-                'identifier': request.form.get('moderator_identifier', '').strip(),
-                'url': request.form.get('moderator_url', '').strip()
-            }
-            
-            # Validate required moderator fields
-            if not moderator_info['name']:
-                flash('Moderator name is required', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            if not moderator_info['email']:
-                flash('Moderator email is required', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Validate email format
-            if not validate_email(moderator_info['email']):
-                flash('Invalid moderator email format', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Validate ORCID if provided
-            if moderator_info['identifier'] and not validate_orcid(moderator_info['identifier']):
-                flash('Invalid ORCID format', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Validate URL if provided
-            if moderator_info['url'] and not validate_url(moderator_info['url']):
-                flash('Invalid moderator URL format', 'error')
-                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, filename=filename))
-            
-            # Remove empty fields
-            moderator_info = {k: v for k, v in moderator_info.items() if v}
-            
-            # Get submission details for better success message
-            submission = submission_handler.get_submission_by_filename(dandiset_id, filename, 'community')
-            
-            success = submission_handler.approve_submission(dandiset_id, filename, moderator_info)
-            if success:
-                if submission:
-                    resource_name = submission.get('name', 'Unknown Resource')
-                    display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-                    flash(f'Successfully approved "{resource_name}" for {display_id}', 'success')
-                else:
-                    flash(f'Successfully approved submission: {filename}', 'success')
-            else:
-                flash(f'Failed to approve submission: {filename}', 'error')
-        except Exception as e:
-            flash(f'Error approving submission: {str(e)}', 'error')
-        
-        # Redirect back to moderation page
-        return redirect(url_for('moderate'))
+def approve_submission(dandiset_id, resource_uuid):
+    """Approve a community submission (UI endpoint combining GET and POST).
 
-@app.route('/delete/<dandiset_id>/<filename>/<status>', methods=['POST'])
-@login_required
-def delete_submission(dandiset_id, filename, status):
-    """Delete a submission with moderator authentication"""
-    # Check if user is a moderator
+    GET:
+    - Renders the moderation approval form for the specified submission.
+    - Requires authenticated moderator.
+    - Retrieves the pending submission via /api/moderation/submissions/{dandiset_id}/{resource_uuid}.
+    - Prefills moderator name/email from the current session.
+
+    POST:
+    - Submits approval for the specified submission.
+    - Requires authenticated moderator.
+    - Forwards JSON payload (moderator_name, moderator_email, optional identifier/url) to
+      /api/moderation/submissions/{dandiset_id}/{resource_uuid}/approve.
+    - Parses API response, flashes success/error, then redirects to /moderate.
+
+    Notes:
+    - This route is a thin UI orchestrator; all validation and side-effects live in the API.
+    """
+    # Enforce moderator role for both GET and POST
     if not auth_manager.is_moderator():
         flash('Access denied. Moderator privileges required.', 'error')
         return redirect(url_for('index'))
-    
-    try:
-        # Validate parameters
-        if status not in ['community', 'approved']:
-            flash('Invalid submission status', 'error')
+
+    api_base = request.host_url.rstrip('/')
+
+    if request.method == 'GET':
+        # GET: render approval form (fetches pending submission via moderation API)
+        try:
+            resp = requests.get(
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{resource_uuid}/pending",
+                cookies=request.cookies,
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                submission = data.get('data', data)
+
+                return render_template(
+                    'approve_form.html',
+                    submission=submission,
+                    dandiset_id=dandiset_id,
+                    resource_uuid=resource_uuid
+                )
+            else:
+                # Extract error message if available
+                try:
+                    err = resp.json().get('error', {})
+                    msg = err.get('message') or err or f"Status {resp.status_code}"
+                except Exception:
+                    msg = f"Status {resp.status_code}"
+                flash(f'Error loading submission: {msg}', 'error')
+                return redirect(url_for('moderate'))
+        except Exception as e:
+            flash(f'Error loading submission: {str(e)}', 'error')
             return redirect(url_for('moderate'))
-        
-        # Get current user info for audit trail
+
+    elif request.method == 'POST':
+        # POST: submit approval (forwards moderator info to moderation API)
+        try:
+            # Get moderator information from form (auto-filled from session)
+            name = request.form.get('moderator_name', '').strip()
+            email = request.form.get('moderator_email', '').strip()
+            identifier = request.form.get('moderator_identifier', '').strip()
+            url_field = request.form.get('moderator_url', '').strip()
+
+            # Minimal presence checks for UX; API performs canonical validation
+            if not name or not email:
+                flash('Moderator name and email are required', 'error')
+                return redirect(url_for('approve_submission', dandiset_id=dandiset_id, resource_uuid=resource_uuid))
+
+            payload = {
+                'moderator_name': name,
+                'moderator_email': email,
+            }
+            if identifier:
+                payload['moderator_identifier'] = identifier
+            if url_field:
+                payload['moderator_url'] = url_field
+
+            resp = requests.post(
+                f"{api_base}/api/moderation/submissions/{dandiset_id}/{resource_uuid}/approve",
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                cookies=request.cookies,
+                timeout=10,
+            )
+
+            if resp.status_code == 200:
+                data = resp.json().get('data') if resp.headers.get('Content-Type', '').startswith('application/json') else None
+                resource_name = (data or {}).get('name', resource_uuid)
+                display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+                flash(f'Successfully approved "{resource_name}" for {display_id}', 'success')
+            else:
+                try:
+                    err_json = resp.json()
+                    if 'error' in err_json:
+                        msg = err_json['error'].get('message', f"Status {resp.status_code}")
+                    else:
+                        msg = f"Status {resp.status_code}"
+                except Exception:
+                    msg = f"Status {resp.status_code}"
+                flash(f'Failed to approve submission: {msg}', 'error')
+
+        except Exception as e:
+            flash(f'Error approving submission: {str(e)}', 'error')
+
+        # Redirect back to moderation page
+        return redirect(url_for('moderate'))
+
+@app.route('/delete/<dandiset_id>/<resource_uuid>/<status>', methods=['POST'])
+@login_required
+def delete_submission(dandiset_id, resource_uuid, status):
+    """Delete a submission with moderator authentication via moderation API"""
+    # Require moderator
+    if not auth_manager.is_moderator():
+        flash('Access denied. Moderator privileges required.', 'error')
+        return redirect(url_for('index'))
+
+    # Optional quick UX check; canonical validation happens in the API/service
+    if status not in ['pending', 'approved']:
+        flash("Invalid submission status", 'error')
+        return redirect(url_for('moderate'))
+
+    try:
+        # Build moderator payload from current session user
         current_user = auth_manager.get_current_user()
         if not current_user:
             flash('User information not available', 'error')
             return redirect(url_for('moderate'))
-        
-        moderator_info = {
-            'name': current_user.get('name', 'Unknown Moderator'),
-            'email': current_user.get('email'),
-            'identifier': current_user.get('identifier'),
-            'url': current_user.get('url')
+
+        payload = {
+            'moderator_name': current_user.get('name', 'Unknown Moderator'),
+            'moderator_email': current_user.get('email'),
         }
-        
-        # Get submission details for better success message
-        submission = submission_handler.get_submission_by_filename(dandiset_id, filename, status)
-        
-        # Perform deletion
-        success = submission_handler.delete_submission(dandiset_id, filename, status, moderator_info)
-        
-        if success:
-            if submission:
-                resource_name = submission.get('name', 'Unknown Resource')
-                display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
-                status_text = "pending" if status == 'community' else "approved"
-                flash(f'Successfully deleted {status_text} submission "{resource_name}" for {display_id}', 'success')
-            else:
-                flash(f'Successfully deleted submission: {filename}', 'success')
+        if current_user.get('identifier'):
+            payload['moderator_identifier'] = current_user.get('identifier')
+        if current_user.get('url'):
+            payload['moderator_url'] = current_user.get('url')
+
+        api_base = request.host_url.rstrip('/')
+
+        # Call the moderation DELETE API
+        resp = requests.delete(
+            f"{api_base}/api/moderation/submissions/{dandiset_id}/{resource_uuid}/{status}",
+            json=payload,
+            headers={'Content-Type': 'application/json'},
+            cookies=request.cookies,
+            timeout=10,
+        )
+
+        if resp.status_code == 200:
+            resp_json = resp.json() if resp.headers.get('Content-Type', '').startswith('application/json') else {}
+            data = resp_json.get('data', {})
+            resource_name = data.get('resource_name', resource_uuid)
+            display_id = f"DANDI:{dandiset_id.split('_')[1]}" if '_' in dandiset_id else f"DANDI:{dandiset_id.zfill(6)}"
+            status_text = "pending" if status == 'pending' else "approved"
+            flash(f"Successfully deleted {status_text} submission \"{resource_name}\" for {display_id}", 'success')
         else:
-            flash(f'Failed to delete submission: {filename}', 'error')
-            
+            try:
+                err_json = resp.json()
+                if 'error' in err_json:
+                    msg = err_json['error'].get('message', f"Status {resp.status_code}")
+                else:
+                    msg = f"Status {resp.status_code}"
+            except Exception:
+                msg = f"Status {resp.status_code}"
+            flash(f"Failed to delete submission: {msg}", 'error')
+
     except Exception as e:
         flash(f'Error deleting submission: {str(e)}', 'error')
-    
-    # Determine where to redirect based on the referring page
+
+    # Redirect to appropriate page based on referrer
     referrer = request.referrer
     if referrer and 'dandiset' in referrer:
-        # Redirect back to dandiset resources page
         return redirect(url_for('dandiset_resources', dandiset_id=dandiset_id))
-    else:
-        # Redirect back to moderation page
-        return redirect(url_for('moderate'))
+    return redirect(url_for('moderate'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -530,9 +547,12 @@ def register():
             return render_template('register.html')
         
         # Validate email format
-        if not validate_email(email):
+        try:
+            AnnotationContributor.validate_email(email)
+        except PydanticCustomError:
             flash('Invalid email format', 'error')
             return render_template('register.html')
+
         
         # Check password confirmation
         if password != confirm_password:
@@ -557,34 +577,90 @@ def register():
 @app.route('/my-submissions')
 @login_required
 def my_submissions():
-    """Display current user's submissions"""
+    """Display current user's submissions via the new API"""
     try:
         current_user = auth_manager.get_current_user()
         if not current_user:
             flash('You must be logged in to view your submissions', 'error')
             return redirect(url_for('login'))
-        
+
         user_email = current_user['email']
-        
-        # Get pagination parameters
+
+        # Pagination parameters
         community_page = request.args.get('community_page', 1, type=int)
         approved_page = request.args.get('approved_page', 1, type=int)
-        per_page = 9  # 9 submissions per page for 3x3 grid
-        
-        # Get paginated user submissions
-        community_submissions, community_pagination, approved_submissions, approved_pagination = \
-            submission_handler.get_user_submissions_paginated(user_email, community_page, approved_page, per_page)
-        
-        # Get all dandisets for navigation
-        all_dandisets = submission_handler.get_all_dandisets()
-        
+        per_page = request.args.get('per_page', 9, type=int)
+
+        api_base = request.host_url.rstrip('/')
+
+        # Call the unified API endpoints for user resources
+        community_resp = requests.get(
+            f"{api_base}/api/resources/user/{user_email}/pending",
+            params={
+                'page': community_page,
+                'per_page': per_page
+            },
+            cookies=request.cookies,
+            timeout=10
+        )
+        approved_resp = requests.get(
+            f"{api_base}/api/resources/user/{user_email}/approved",
+            params={
+                'page': approved_page,
+                'per_page': per_page
+            },
+            cookies=request.cookies,
+            timeout=10
+        )
+
+        # Handle errors
+        if community_resp.status_code != 200:
+            try:
+                err_json = community_resp.json()
+                if 'error' in err_json:
+                    msg = err_json['error'].get('message', f"Status {community_resp.status_code}")
+                else:
+                    msg = f"Status {community_resp.status_code}"
+            except Exception:
+                msg = f"Status {community_resp.status_code}"
+            flash(f'Error loading your community submissions: {msg}', 'error')
+            return redirect(url_for('index'))
+
+        if approved_resp.status_code != 200:
+            try:
+                err_json = approved_resp.json()
+                if 'error' in err_json:
+                    msg = err_json['error'].get('message', f"Status {approved_resp.status_code}")
+                else:
+                    msg = f"Status {approved_resp.status_code}"
+            except Exception:
+                msg = f"Status {approved_resp.status_code}"
+            flash(f'Error loading your approved submissions: {msg}', 'error')
+            return redirect(url_for('index'))
+
+        community_json = community_resp.json()
+        approved_json = approved_resp.json()
+        community_submissions = community_json.get('data', [])
+        approved_submissions = approved_json.get('data', [])
+        community_pagination = community_json.get('pagination', {'page': community_page, 'per_page': per_page})
+        approved_pagination = approved_json.get('pagination', {'page': approved_page, 'per_page': per_page})
+
+        # Build list of all dandisets for navigation based on submissions returned
+        # Fallback to unique dandiset ids from the submissions
+        all_ids = set()
+        for sub in community_submissions + approved_submissions:
+            did = sub.get('dandiset_id')
+            if did:
+                all_ids.add(did)
+        all_dandisets = [{'id': did, 'display_id': f"DANDI:{did}"} for did in sorted(all_ids)]
+
         return render_template('my_submissions.html',
-                             community_submissions=community_submissions,
-                             approved_submissions=approved_submissions,
-                             community_pagination=community_pagination,
-                             approved_pagination=approved_pagination,
-                             all_dandisets=all_dandisets,
-                             user_email=user_email)
+                               community_submissions=community_submissions,
+                               approved_submissions=approved_submissions,
+                               community_pagination=community_pagination,
+                               approved_pagination=approved_pagination,
+                               all_dandisets=all_dandisets,
+                               user_email=user_email)
     except Exception as e:
         flash(f'Error loading your submissions: {str(e)}', 'error')
         return redirect(url_for('index'))

@@ -28,6 +28,7 @@ def main():
     approved_resource = ExternalResource(**metadata)
 
     print("Created submitted resource:")
+    print(f"UUID: {submitted_resource.uuid}")
     print(f"Name: {submitted_resource.name}")
     print(f"Identifier: {submitted_resource.identifier}")
     print(f"Relation: {submitted_resource.relation}")
@@ -36,6 +37,7 @@ def main():
     print(f"Schema Key: {submitted_resource.schemaKey}")
 
     print("\nCreated approved resource:")
+    print(f"UUID: {approved_resource.uuid}")
     print(f"Name: {approved_resource.name}")
     print(f"Identifier: {approved_resource.identifier}")
     print(f"Relation: {approved_resource.relation}")

@@ -3,6 +3,7 @@ from dandischema.models import EmailStr, AnyHttpUrl
 from pydantic import Field, field_validator, ValidationError
 from typing import Literal, Optional
 from datetime import datetime
+from uuid import UUID
 import re
 
 class AnnotationContributor(DandiBaseModel):
@@ -56,7 +57,18 @@ class AnnotationContributor(DandiBaseModel):
         
         return v
 
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email format using pydantic EmailStr"""
+        EmailStr._validate(v)
+        return v
+
 class ExternalResource(Resource):
+    uuid: UUID = Field(
+        title="UUID",
+        description="Programmatic unique identifier for this resource",
+        json_schema_extra={"readOnly": True},
+    )
     dandiset_id: str = Field(
         title="DANDI Set ID",
         description="The DANDI set identifier this resource is associated with (e.g., '000001')"
@@ -93,3 +105,9 @@ class ExternalResource(Resource):
             return v
         else:
             raise ValueError('Enter 6-digit DANDI set ID (e.g., 000001)')
+
+    @classmethod
+    def validate_uuid(cls, v):
+        """Validate UUID format"""
+        UUID(str(v))
+        return v
